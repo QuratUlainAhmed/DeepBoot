@@ -1,0 +1,167 @@
+{
+  "workload_csv_rows": 3360,
+  "workload_last_submission_seconds": 55375,
+  "job_count_completed": 3360,
+  "training_jct": {
+    "count": 160,
+    "mean_seconds": 2386.125,
+    "median_seconds": 785.0,
+    "p95_seconds": 5388.049999999999,
+    "min_seconds": 72.0,
+    "max_seconds": 56981.0
+  },
+  "inference_jct": {
+    "count": 3200,
+    "mean_seconds": 8.4796875,
+    "median_seconds": 8.0,
+    "p95_seconds": 15.0,
+    "min_seconds": 1.0,
+    "max_seconds": 17.0
+  },
+  "all_jobs_jct": {
+    "count": 3360,
+    "mean_seconds": 121.70089285714286,
+    "median_seconds": 9.0,
+    "p95_seconds": 17.0,
+    "min_seconds": 1.0,
+    "max_seconds": 56981.0
+  },
+  "training_jobs_by_application": {
+    "bert": {
+      "count": 7,
+      "mean_seconds": 4144.857142857143,
+      "median_seconds": 4166.0,
+      "p95_seconds": 5366.6,
+      "min_seconds": 2912.0,
+      "max_seconds": 5387.0
+    },
+    "cifar10": {
+      "count": 66,
+      "mean_seconds": 1050.909090909091,
+      "median_seconds": 1038.5,
+      "p95_seconds": 1601.0,
+      "min_seconds": 581.0,
+      "max_seconds": 1733.0
+    },
+    "deepspeech2": {
+      "count": 12,
+      "mean_seconds": 4202.833333333333,
+      "median_seconds": 4501.0,
+      "p95_seconds": 5366.2,
+      "min_seconds": 2727.0,
+      "max_seconds": 5408.0
+    },
+    "imagenet": {
+      "count": 4,
+      "mean_seconds": 47560.75,
+      "median_seconds": 45813.0,
+      "p95_seconds": 55804.7,
+      "min_seconds": 41636.0,
+      "max_seconds": 56981.0
+    },
+    "ncf": {
+      "count": 68,
+      "mean_seconds": 72.0,
+      "median_seconds": 72.0,
+      "p95_seconds": 72.0,
+      "min_seconds": 72.0,
+      "max_seconds": 72.0
+    },
+    "yolov3": {
+      "count": 3,
+      "mean_seconds": 12611.0,
+      "median_seconds": 13703.0,
+      "p95_seconds": 13847.0,
+      "min_seconds": 10267.0,
+      "max_seconds": 13863.0
+    }
+  },
+  "training_restarts_by_application": {
+    "bert": {
+      "jobs": 7,
+      "total": 146,
+      "mean": 20.857142857142858,
+      "max": 36
+    },
+    "cifar10": {
+      "jobs": 66,
+      "total": 492,
+      "mean": 7.454545454545454,
+      "max": 16
+    },
+    "deepspeech2": {
+      "jobs": 12,
+      "total": 235,
+      "mean": 19.583333333333332,
+      "max": 36
+    },
+    "imagenet": {
+      "jobs": 4,
+      "total": 626,
+      "mean": 156.5,
+      "max": 408
+    },
+    "ncf": {
+      "jobs": 68,
+      "total": 0,
+      "mean": 0.0,
+      "max": 0
+    },
+    "yolov3": {
+      "jobs": 3,
+      "total": 103,
+      "mean": 34.333333333333336,
+      "max": 57
+    }
+  },
+  "training_restart_count": {
+    "mean": 10.0125,
+    "median": 5.0,
+    "p95": 29.049999999999983,
+    "total": 1602,
+    "jobs_with_restart": 92,
+    "jobs_count": 160,
+    "max": 408
+  },
+  "training_rescale_delay_seconds": {
+    "mean_per_job": 311.95,
+    "total_job_seconds": 49912.0
+  },
+  "gpu_samples": 70500,
+  "simulated_seconds": 70500.0,
+  "cluster_capacity_gpus": 64,
+  "gpu_utilization": {
+    "gpu_use": {
+      "mean_gpus": 60.39204255319149,
+      "mean_capacity_percent": 94.3625664893617,
+      "peak_gpus": 64,
+      "peak_capacity_percent": 100.0
+    },
+    "real_gpu_use": {
+      "mean_gpus": 53.0448085106383,
+      "mean_capacity_percent": 82.88251329787234,
+      "peak_gpus": 64,
+      "peak_capacity_percent": 100.0
+    },
+    "real_running_gpu_use": {
+      "mean_gpus": 53.167432624113474,
+      "mean_capacity_percent": 83.0741134751773,
+      "peak_gpus": 64,
+      "peak_capacity_percent": 100.0
+    }
+  },
+  "scheduling_optimization": {
+    "decision_count": 7263,
+    "mean_wall_seconds": 0.9970625086052597,
+    "p95_wall_seconds": 1.2527999999999992,
+    "max_wall_seconds": 2335.784,
+    "sum_wall_seconds": 7241.665000000001
+  },
+  "metric_log_values": {
+    "clock": [],
+    "sum_goodput": [],
+    "avg_goodput": [],
+    "sum_speedup": [],
+    "avg_speedup": []
+  }
+}

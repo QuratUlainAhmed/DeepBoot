@@ -1,0 +1,13 @@
+﻿{
+    "command":  "C:\\Users\\HP\\miniconda3\\envs\\pollux\\python.exe -u simulator.py --policy pollux --workload experiment/workload/small.csv --AFE 0 --AISS 1 --log_file 0 --INFER_SCHEDULER 0 --output experiment\\results\\reproduction\\Pollux-small-ATSI\\simulator-output --min-nodes 16 --REPAIR_TRAIN 0 --num-gpus 4",
+    "start_time":  "2026-11-22T19:35:22.0066822+05:00",
+    "end_time":  "2026-11-22T21:55:46.1116214+05:00",
+    "runtime_seconds":  8424.1,
+    "exit_code":  0,
+    "python_version":  "3.8.12",
+    "environment":  "pollux",
+    "git_commit":  "cc85a24b346cfac17603cdfc9f5018089ac59432",
+    "branch":  "main",
+    "pop_size":  50,
+    "generations":  50
+}
