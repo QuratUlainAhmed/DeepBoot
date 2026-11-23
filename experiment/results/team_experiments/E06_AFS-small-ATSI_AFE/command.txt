@@ -1,0 +1,2 @@
+﻿$env:PYTHONDONTWRITEBYTECODE = '1'
+& 'C:\Users\HP\miniconda3\envs\pollux\python.exe' -u simulator.py --policy afs --workload experiment/workload/small.csv --AFE 1 --AISS 1 --ARYL 1 --log_file 0 --output experiment/results/reproduction/AFS-small-ATSI_AFE/simulator-output --min-nodes 16 --num-gpus 4 2>&1 | Tee-Object -FilePath experiment/results/reproduction/AFS-small-ATSI_AFE/console.log

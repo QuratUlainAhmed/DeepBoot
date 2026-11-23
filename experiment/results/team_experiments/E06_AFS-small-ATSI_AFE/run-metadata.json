@@ -1,0 +1,11 @@
+﻿{
+    "command":  "C:\\Users\\HP\\miniconda3\\envs\\pollux\\python.exe -u simulator.py --policy afs --workload experiment/workload/small.csv --AFE 1 --AISS 1 --ARYL 1 --log_file 0 --output experiment\\results\\reproduction\\AFS-small-ATSI_AFE\\simulator-output --min-nodes 16 --num-gpus 4",
+    "start_time":  "2026-11-22T17:04:31.8395616+05:00",
+    "end_time":  "2026-11-22T17:47:21.3653099+05:00",
+    "runtime_seconds":  2569.53,
+    "exit_code":  0,
+    "python_version":  "3.8.12",
+    "environment":  "pollux",
+    "git_commit":  "cc85a24b346cfac17603cdfc9f5018089ac59432",
+    "branch":  "main"
+}
