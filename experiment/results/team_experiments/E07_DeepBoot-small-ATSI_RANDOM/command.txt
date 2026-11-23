@@ -1,0 +1,1 @@
+﻿C:\Users\HP\miniconda3\envs\pollux\python.exe -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --log_file 0 --ARYL 0 --output experiment\results\reproduction\DeepBoot-small-ATSI_RANDOM\simulator-output --min-nodes 16 --num-gpus 4 --random_allocate 1 --policy dp
