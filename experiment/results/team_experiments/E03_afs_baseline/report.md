@@ -14,7 +14,7 @@ Run the repository's AFS scheduler (`--policy afs`) on the small mixed training/
 | Jobs completed | 3360 (160 training, 3200 inference) |
 | Cluster | 16 nodes x 4 GPUs (64 GPUs) |
 
-**Deviation from the repository scripts:** no script matches "AFS, small, AISS on, AFE off". `AFS-small.sh` has AISS=0 and `AFS-small-ATSI_AFE.sh` has AFE=1. The simulator was run directly with the command in section 4, with no source changes. This choice has not been confirmed by the team.
+**Deviation from the repository scripts:** no script matches "AFS, small, AISS on, AFE off". `AFS-small.sh` has AISS=0 and `AFS-small-ATSI_AFE.sh` has AFE=1. The simulator was run directly with the command in section 4, with no source changes. The configuration matches E06's `command.txt` (`--AFE 1 --AISS 1 --ARYL 1`) except for `--AFE 0`.
 
 ## 3. Environment
 | Item | Value |
@@ -62,6 +62,18 @@ python3 simulator.py --policy afs --workload ./experiment/workload/small.csv --A
 
 Peak allocated GPUs: 100.0%. Simulated time: 82440 s (22.90 h).
 
+### E03 (AFE off) vs E06 (AFE on)
+| Metric | E03 (AFE off) | E06 (AFE on) |
+|---|---:|---:|
+| Training mean JCT (s) | 2871.90 | 2662.44 |
+| Training median (s) | 863.50 | 834.50 |
+| Training P95 (s) | 7516.25 | 6592.90 |
+| Training max (s) | 73146 | 62726 |
+| Inference mean (s) | 7.78 | 7.78 |
+| All-jobs mean (s) | 144.17 | 134.19 |
+
+E06 values are from its `analysis-summary.json`. With AFE on, mean training JCT is about 7.3% lower. This is one run each, so it is descriptive only.
+
 ![JCT CDF](jct_cdf.png)
 ![GPU utilization](gpu_utilization.png)
 ![Training JCT summary](training_jct_summary.png)
@@ -75,7 +87,6 @@ Peak allocated GPUs: 100.0%. Simulated time: 82440 s (22.90 h).
 ## 7. Limitations
 - Single run on one workload; no variance estimate.
 - Differs from E01 in more than the policy (ARYL=1 here vs default 0 in E01, and a different Git commit), so differences cannot be attributed to the scheduler alone.
-- The AISS=1 choice was not confirmed by the team.
 - The simulator is trace-driven; rescaling and restart costs are modelled, not measured.
 - `metric.log` is empty, so goodput/speedup data is unavailable.
 
