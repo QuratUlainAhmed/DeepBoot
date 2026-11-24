@@ -85,8 +85,8 @@ Not an apples-to-apples comparison:
 
 ## 8. Recommended next step
 
-1. Ask the person who ran E05 for its raw `jobinfo.log` or `console.log` (local, not pushed). With it we can place the outlier and compute cost vs job count without any new run.
-2. Read `Problem.__init__` (`pollux.py` line 317 onwards) and `event_update` to close the two open code questions.
+1. Ask the person who ran E05 (machine `C:\Users\HP`) for `experiment\results\reproduction\Pollux-small-ATSI\simulator-output\jobinfo.log`. It was read by `analyze_results.py` but never pushed, and holds the per-call `optimize_history`. With it we can place the 2,335.8 s call and compute cost vs job count without any new run.
+2. The two code questions (`Problem.__init__` and `event_update`) are now traced in sections 3 and 5. What remains is counting the non-tick events by trigger case, which also needs the per-call log.
 3. If the data stays unavailable, propose a minimal profiling run for team approval: Pollux, small workload, otherwise identical to E05 but `INFER_SCHEDULER=1`, recording `time.process_time()` beside wall time. It would write to a fresh output folder and change no existing results.
 
 ## 9. Research direction
