@@ -15,9 +15,11 @@ TEAM_PATH = "experiment/results/team_experiments"
 EXPERIMENTS = [
     {
         "id": "E01", "name": "DeepBoot baseline, small workload",
+        "purpose": "DeepBoot small-workload baseline with AFE disabled.",
         "scheduler": "DeepBoot", "policy": "dp", "workload": "small.csv",
         "scale": "small", "nodes": "16", "gpus_per_node": "4",
         "afe": "0", "aiss": "1",
+        "aryl": "0 (CLI default)", "infer_allocation": "ATS-I allocation; random_allocate=0 (CLI default)",
         "infer_mode": "ATS-I (INFER_SCHEDULER=1 default; ARYL=0)",
         "commit": "cc85a24b346cfac17603cdfc9f5018089ac59432",
         "status": "completed", "member": "UNKNOWN",
@@ -29,14 +31,20 @@ EXPERIMENTS = [
         "job_source": "E01_deepboot_baseline/summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 3,360 JCTs. No full execution log. Wall time is an interval estimate, not /usr/bin/time.",
+        "metrics": "JCT by job; GPU counters; simulated clock; metric log (empty)",
+        "config_source": "E01 report Sections 4, 6; launcher experiment/cmd/16node-4gpu/small/DeepBoot-small-ATSI.sh; simulator.py CLI defaults",
+        "confidence": "HIGH for configuration; MEDIUM for runtime measurement",
     },
     {
         "id": "E02", "name": "DeepBoot small workload, AFE on",
+        "purpose": "DeepBoot small-workload AFE-on run, intended counterpart to E01.",
         "scheduler": "DeepBoot",
-        "policy": "UNKNOWN (exact command not retained)",
+        "policy": "dp (E02 launcher; exact executed invocation unrecorded)",
         "workload": "small.csv (all summary job names match small.csv)",
-        "scale": "small", "nodes": "UNKNOWN", "gpus_per_node": "UNKNOWN",
-        "afe": "1", "aiss": "1", "infer_mode": "UNKNOWN (command not retained)",
+        "scale": "small", "nodes": "16 (E02 launcher; invocation unrecorded)", "gpus_per_node": "4 (E02 launcher; invocation unrecorded)",
+        "afe": "1", "aiss": "1", "aryl": "0 (launcher omits flag; default if used)",
+        "infer_allocation": "ATS-I path; random_allocate=0 (launcher omits flag; defaults if used)",
+        "infer_mode": "INFER_SCHEDULER=1 (default if launcher used); runtime invocation unrecorded",
         "commit": "6772f554dd104d908328f63e4ab719184c6ff4d3",
         "status": "completed", "member": "UNKNOWN",
         "dir": "E02_deepboot_afe", "report": "",
@@ -46,13 +54,18 @@ EXPERIMENTS = [
         "runtime": 1313.2016817, "runtime_source": "E02_deepboot_afe/runtime.txt (timing method not specified)",
         "job_source": "E02_deepboot_afe/summary.json",
         "gpu_capacity": 64,
-        "notes": "Exit 0; 3,360 JCTs. Commit title says DeepBoot small/AISS on/AFE on. No exact command or report; node/GPU shape and inference scheduling mode remain unverified. analysis.json reports GPU percent using 64-GPU normalization; configuration denominator is not independently documented. run_tail.log is partial.",
+        "notes": "Exit 0; 3,360 JCTs. E02 commit title and matching launcher support configuration, but no invocation record/full log proves that launcher was used. 64-GPU normalization is recorded in analysis; run_tail.log is partial.",
+        "metrics": "JCT by job; GPU counters and analysis; simulated clock; metric log (empty); jobinfo",
+        "config_source": "E02 commit d589451; matching launcher at experiment/cmd/16node-4gpu/small/DeepBoot-small-ATSI_AFE.sh; output commit.txt; simulator.py defaults; no command record",
+        "confidence": "MEDIUM (launcher and commit metadata agree; actual executed flags not independently recorded)",
     },
     {
         "id": "E03", "name": "AFS small baseline, AFE off",
+        "purpose": "AFS small-workload reference with AFE disabled.",
         "scheduler": "AFS", "policy": "afs", "workload": "small.csv",
         "scale": "small", "nodes": "16", "gpus_per_node": "4",
         "afe": "0", "aiss": "1",
+        "aryl": "1", "infer_allocation": "Aryl-specific inference allocation",
         "infer_mode": "AISS lifecycle + Aryl-specific path (ARYL=1; INFER_SCHEDULER=1 default)",
         "commit": "6772f554dd104d908328f63e4ab719184c6ff4d3",
         "status": "completed", "member": "UNKNOWN",
@@ -64,12 +77,15 @@ EXPERIMENTS = [
         "job_source": "E03_afs_baseline/summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 3,360 JCTs. ARYL=1 differs from pure ATS-I behavior. execution.log is only a 200-line tail; report says full ~576 MB capture is local/not pushed.",
+        "metrics": "JCT by job; GPU counters; simulated clock; metric log (empty)", "config_source": "E03 report and retained run metadata", "confidence": "HIGH",
     },
     {
         "id": "E04", "name": "DeepBoot workload scaling, middle workload",
+        "purpose": "DeepBoot middle-workload scaling contrast against small workload.",
         "scheduler": "DeepBoot", "policy": "dp", "workload": "middle.csv",
         "scale": "middle", "nodes": "16", "gpus_per_node": "4",
         "afe": "0", "aiss": "1",
+        "aryl": "0", "infer_allocation": "ATS-I allocation; random_allocate=0",
         "infer_mode": "ATS-I (INFER_SCHEDULER=1 default; ARYL=0)",
         "commit": "6772f554dd104d908328f63e4ab719184c6ff4d3",
         "status": "completed", "member": "UNKNOWN",
@@ -81,12 +97,15 @@ EXPERIMENTS = [
         "job_source": "E04_deepboot_workload_scaling/simulator-output/summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 16,160 JCTs (160 training, 16,000 inference). Complete compressed execution.log.gz is local and excluded from Git due to size. Inference rows differ from small workload; scaling contrast is descriptive.",
+        "metrics": "JCT by job; GPU counters; simulated clock; metric log (empty)", "config_source": "E04 report, command.txt, run_e04.sh, environment.txt", "confidence": "HIGH",
     },
     {
         "id": "E05", "name": "Pollux small, AISS lifecycle",
+        "purpose": "Pollux optimizer-path reference on small mixed workload.",
         "scheduler": "Pollux", "policy": "pollux", "workload": "small.csv",
         "scale": "small", "nodes": "16", "gpus_per_node": "4",
         "afe": "0", "aiss": "1",
+        "aryl": "0", "infer_allocation": "Pollux optimizer inference path",
         "infer_mode": "Pollux optimizer path (INFER_SCHEDULER=0; REPAIR_TRAIN=0)",
         "commit": "cc85a24b346cfac17603cdfc9f5018089ac59432",
         "status": "completed", "member": "UNKNOWN",
@@ -98,12 +117,15 @@ EXPERIMENTS = [
         "job_source": "E05_Pollux-small-ATSI/job-metrics.csv; analysis-summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 3,360 completed. Filename says ATSI but INFER_SCHEDULER=0 uses Pollux optimizer. Raw summary.json/gpu.log/metric.log and reported console.log are not in this folder; job-metrics.csv and analysis-summary.json are retained.",
+        "metrics": "Per-job JCT; derived GPU utilization; optimization-time analysis", "config_source": "E05 report, command.txt, run-metadata.json", "confidence": "HIGH",
     },
     {
         "id": "E06", "name": "AFS small, AFE on",
+        "purpose": "AFS AFE-on result, paired descriptively with E03.",
         "scheduler": "AFS", "policy": "afs", "workload": "small.csv",
         "scale": "small", "nodes": "16", "gpus_per_node": "4",
         "afe": "1", "aiss": "1",
+        "aryl": "1", "infer_allocation": "Aryl-specific inference allocation",
         "infer_mode": "AISS lifecycle + Aryl-specific path (ARYL=1; INFER_SCHEDULER=1 default)",
         "commit": "cc85a24b346cfac17603cdfc9f5018089ac59432",
         "status": "completed", "member": "UNKNOWN",
@@ -115,12 +137,15 @@ EXPERIMENTS = [
         "job_source": "E06_AFS-small-ATSI_AFE/job-metrics.csv; analysis-summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 3,360 completed. ARYL=1 means this is not a pure ATS-I inference configuration. Raw simulator summary/gpu/metric logs and reported full console capture are absent from this folder.",
+        "metrics": "Per-job JCT; derived GPU utilization", "config_source": "E06 report, command.txt, run-metadata.json", "confidence": "HIGH",
     },
     {
         "id": "E07", "name": "DeepBoot small, random inference allocation",
+        "purpose": "DeepBoot inference random-allocation branch comparison.",
         "scheduler": "DeepBoot", "policy": "dp", "workload": "small.csv",
         "scale": "small", "nodes": "16", "gpus_per_node": "4",
         "afe": "0", "aiss": "1",
+        "aryl": "0", "infer_allocation": "random_allocate=1",
         "infer_mode": "random_allocate=1 (INFER_SCHEDULER=1; ARYL=0)",
         "commit": "cc85a24b346cfac17603cdfc9f5018089ac59432",
         "status": "completed", "member": "UNKNOWN",
@@ -132,15 +157,17 @@ EXPERIMENTS = [
         "job_source": "E07_DeepBoot-small-ATSI_RANDOM/job-metrics.csv; analysis-summary.json",
         "gpu_capacity": 64,
         "notes": "Exit 0; 3,360 completed. random_allocate selects a separate inference branch; report notes no explicit RNG/seed. Raw simulator summary/gpu/metric files and reported console log are absent from this folder.",
+        "metrics": "Per-job JCT; derived GPU utilization", "config_source": "E07 report, command.txt, run-metadata.json", "confidence": "HIGH",
     },
 ]
 
 
 REGISTRY_FIELDS = [
-    "Experiment ID", "Experiment name", "Scheduler", "Policy", "Workload",
+    "Experiment ID", "Experiment name", "Purpose", "Scheduler", "Policy", "Workload",
     "Workload scale", "Number of nodes", "GPUs per node", "AFE", "AISS",
-    "Inference scheduling mode", "Git commit", "Status",
+    "ARYL", "Inference allocation mode", "Inference scheduling mode", "Git commit", "Status",
     "Assigned team member", "Output directory", "Report path", "Notes",
+    "Metrics available", "Configuration source", "Metadata confidence",
 ]
 
 RESULT_FIELDS = [
@@ -226,14 +253,18 @@ def build_rows():
         report = team_path(f"{exp['dir']}/{exp['report']}") if exp["report"] else ""
         registry_rows.append({
             "Experiment ID": exp["id"], "Experiment name": exp["name"],
+            "Purpose": exp["purpose"],
             "Scheduler": exp["scheduler"], "Policy": exp["policy"],
             "Workload": exp["workload"], "Workload scale": exp["scale"],
             "Number of nodes": exp["nodes"], "GPUs per node": exp["gpus_per_node"],
             "AFE": exp["afe"], "AISS": exp["aiss"],
+            "ARYL": exp["aryl"], "Inference allocation mode": exp["infer_allocation"],
             "Inference scheduling mode": exp["infer_mode"], "Git commit": exp["commit"],
             "Status": exp["status"], "Assigned team member": exp["member"],
             "Output directory": team_path(exp["dir"]), "Report path": report,
-            "Notes": exp["notes"],
+            "Notes": exp["notes"], "Metrics available": exp["metrics"],
+            "Configuration source": exp["config_source"],
+            "Metadata confidence": exp["confidence"],
         })
 
         classes, summary = read_jcts(exp, folder)
@@ -271,9 +302,13 @@ def build_rows():
         result_rows.append({
             "Experiment ID": exp["id"], "Scheduler": exp["scheduler"], "Policy": exp["policy"],
             "Workload": exp["workload"],
-            "Cluster configuration": (f"{exp['nodes']} nodes × {exp['gpus_per_node']} GPUs/node"
-                                      if exp["nodes"].isdigit() and exp["gpus_per_node"].isdigit()
-                                      else "UNKNOWN"),
+            "Cluster configuration": (
+                "16 nodes × 4 GPUs/node (launcher; invocation unverified)"
+                if exp["id"] == "E02"
+                else f"{exp['nodes']} nodes × {exp['gpus_per_node']} GPUs/node"
+                if exp["nodes"].isdigit() and exp["gpus_per_node"].isdigit()
+                else "UNKNOWN"
+            ),
             "Total jobs": total_jobs, "Training jobs": workload_training, "Inference jobs": workload_inference,
             "Training mean JCT (s)": stat(training, mean),
             "Training median JCT (s)": stat(training, lambda x: percentile_linear(x, 50)),
@@ -303,7 +338,7 @@ def build_rows():
 
 def write_csv(path, fields, rows):
     with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
