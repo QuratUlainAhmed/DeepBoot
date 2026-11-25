@@ -1,0 +1,1 @@
+C:\Users\HP\miniconda3\envs\pollux\python.exe -u simulator.py --workload experiment/workload/small.csv --AFE 1 --AISS 1 --ARYL 0 --log_file 0 --output C:\Users\HP\DeepBoot\experiment\results\team_experiments\E08_DeepBoot-small-ATSI_AFE\simulator-output --min-nodes 16 --num-gpus 4 --policy dp
