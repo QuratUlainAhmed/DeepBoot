@@ -1,0 +1,88 @@
+{
+  "training": {
+    "0": {
+      "count": 160,
+      "mean": 2463.31875,
+      "p50": 959.0,
+      "p75": 1618.75,
+      "p95": 6527.349999999997,
+      "max": 45877.0
+    },
+    "1": {
+      "count": 160,
+      "mean": 2442.58125,
+      "p50": 984.0,
+      "p75": 1672.75,
+      "p95": 6751.499999999996,
+      "max": 43773.0
+    }
+  },
+  "inference": {
+    "0": {
+      "count": 3200,
+      "mean": 10.7765625,
+      "p50": 11.0,
+      "p75": 13.0,
+      "p95": 16.0,
+      "max": 52.0
+    },
+    "1": {
+      "count": 3200,
+      "mean": 7.835625,
+      "p50": 8.0,
+      "p75": 11.0,
+      "p95": 15.0,
+      "max": 18.0
+    }
+  },
+  "all": {
+    "0": {
+      "count": 3360,
+      "mean": 127.56428571428572,
+      "p50": 11.0,
+      "p75": 13.0,
+      "p95": 28.0,
+      "max": 45877.0
+    },
+    "1": {
+      "count": 3360,
+      "mean": 123.77589285714286,
+      "p50": 8.0,
+      "p75": 11.0,
+      "p95": 17.0,
+      "max": 43773.0
+    }
+  },
+  "paired": {
+    "train": {
+      "jobs_in_both": 160,
+      "mean_diff_aiss1_minus_aiss0_s": -20.7375,
+      "aiss1_faster": 57,
+      "aiss1_slower": 58,
+      "equal": 45
+    },
+    "infer": {
+      "jobs_in_both": 3200,
+      "mean_diff_aiss1_minus_aiss0_s": -2.9409375,
+      "aiss1_faster": 1606,
+      "aiss1_slower": 0,
+      "equal": 1594
+    }
+  },
+  "determinism_vs_E01": {
+    "e01_summary_found": true,
+    "same_job_set": true,
+    "jobs_compared": 3360,
+    "jobs_with_different_jct": 0,
+    "max_abs_jct_difference_s": 0.0,
+    "identical_to_E01": true
+  },
+  "exit_status": {
+    "0": "exit_code=0",
+    "1": "exit_code=0"
+  },
+  "metric_log_empty": {
+    "0": true,
+    "1": true
+  }
+}

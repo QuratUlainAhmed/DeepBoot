@@ -1,0 +1,20 @@
+metric,aiss_0,aiss_1,absolute_change,relative_change
+Training JCT mean (s),2463.31875,2442.58125,-20.74,-0.8%
+Training JCT P50 (s),959.0,984.0,+25.00,+2.6%
+Training JCT P75 (s),1618.75,1672.75,+54.00,+3.3%
+Training JCT P95 (s),6527.349999999997,6751.499999999996,+224.15,+3.4%
+Training JCT max (s),45877.0,43773.0,"-2,104.00",-4.6%
+Inference JCT mean (s),10.7765625,7.835625,-2.94,-27.3%
+Inference JCT P50 (s),11.0,8.0,-3.00,-27.3%
+Inference JCT P75 (s),13.0,11.0,-2.00,-15.4%
+Inference JCT P95 (s),16.0,15.0,-1.00,-6.2%
+Inference JCT max (s),52.0,18.0,-34.00,-65.4%
+All-jobs JCT mean (s),127.56428571428572,123.77589285714286,-3.79,-3.0%
+Jobs completed (count),3360,3360,+0.00,+0.0%
+Allocated GPUs mean (% of 64),96.78114708619702,94.42166071928351,-2.36,-2.4%
+Allocated GPUs peak (% of 64),100.0,100.0,+0.00,+0.0%
+Real used GPUs mean (% of 64),84.45697308132875,83.45855636020151,-1.00,-1.2%
+Real used GPUs peak (% of 64),100.0,100.0,+0.00,+0.0%
+Real running GPUs mean (% of 64),84.55275003579611,83.67769119087602,-0.88,-1.0%
+Real running GPUs peak (% of 64),100.0,100.0,+0.00,+0.0%
+Simulated end clock (s),69840.0,71460.0,"+1,620.00",+2.3%
