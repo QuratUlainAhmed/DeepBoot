@@ -1,0 +1,14 @@
+{
+  "run": "random_seed22_r2",
+  "policy": "random",
+  "random_allocate": 1,
+  "seed": 22,
+  "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+  "command": "PYTHONHASHSEED=22 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 1 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/random_seed22_r2/simulator-output",
+  "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+  "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+  "started_at": "2026-11-26T00:27:30+05:00",
+  "exit_code": 0,
+  "runtime_seconds": 591.39,
+  "ended_at": "2026-11-26T00:37:21+05:00"
+}

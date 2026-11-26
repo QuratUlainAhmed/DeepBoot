@@ -1,0 +1,7 @@
+{
+  "status": "interrupted; excluded from analysis",
+  "seed": 11,
+  "policy": "ats_i",
+  "reason": "The initial launch was manually interrupted after no progress was visible. No simulator result files were produced and no reliable runtime was recorded.",
+  "command_record": "command.txt"
+}

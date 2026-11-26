@@ -1,0 +1,594 @@
+{
+  "per_seed": {
+    "11": {
+      "ats_i": {
+        "metadata": {
+          "run": "ats_i_seed11_r2",
+          "policy": "ats_i",
+          "random_allocate": 0,
+          "seed": 11,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=11 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 0 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/ats_i_seed11_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-25T23:44:49+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 1192.07,
+          "ended_at": "2026-11-26T00:04:41+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2442.58125,
+          "training_p95_jct_s": 6751.499999999996,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.835625,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.42166071928352,
+          "gpu_real_pct": 83.45855636020151,
+          "gpu_real_running_pct": 83.67769119087602,
+          "training_restarts_total": 1894,
+          "training_jobs_with_restarts": 92,
+          "training_rescale_delay_total_s": 49612.0,
+          "scheduling_decisions": 7306,
+          "scheduling_mean_s": 0.014177799069258144,
+          "scheduling_p95_s": 0.06875,
+          "scheduling_total_s": 103.583,
+          "simulated_seconds": 71460,
+          "completed_jobs": 3360
+        }
+      },
+      "random": {
+        "metadata": {
+          "run": "random_seed11_r2",
+          "policy": "random",
+          "random_allocate": 1,
+          "seed": 11,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=11 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 1 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/random_seed11_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-26T00:04:41+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 667.2,
+          "ended_at": "2026-11-26T00:15:49+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2542.8125,
+          "training_p95_jct_s": 6597.5999999999985,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.9253125,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.69216954022988,
+          "gpu_real_pct": 84.23251167385058,
+          "gpu_real_running_pct": 84.45278825431033,
+          "training_restarts_total": 1781,
+          "training_jobs_with_restarts": 119,
+          "training_rescale_delay_total_s": 46406.0,
+          "scheduling_decisions": 7276,
+          "scheduling_mean_s": 0.008116684991753711,
+          "scheduling_p95_s": 0.053,
+          "scheduling_total_s": 59.057,
+          "simulated_seconds": 69600,
+          "completed_jobs": 3360
+        }
+      }
+    },
+    "22": {
+      "ats_i": {
+        "metadata": {
+          "run": "ats_i_seed22_r2",
+          "policy": "ats_i",
+          "random_allocate": 0,
+          "seed": 22,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=22 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 0 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/ats_i_seed22_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-26T00:15:49+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 701.38,
+          "ended_at": "2026-11-26T00:27:30+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2442.58125,
+          "training_p95_jct_s": 6751.499999999996,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.835625,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.42166071928352,
+          "gpu_real_pct": 83.45855636020151,
+          "gpu_real_running_pct": 83.67769119087602,
+          "training_restarts_total": 1894,
+          "training_jobs_with_restarts": 92,
+          "training_rescale_delay_total_s": 49612.0,
+          "scheduling_decisions": 7306,
+          "scheduling_mean_s": 0.009876813577881192,
+          "scheduling_p95_s": 0.054,
+          "scheduling_total_s": 72.16,
+          "simulated_seconds": 71460,
+          "completed_jobs": 3360
+        }
+      },
+      "random": {
+        "metadata": {
+          "run": "random_seed22_r2",
+          "policy": "random",
+          "random_allocate": 1,
+          "seed": 22,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=22 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 1 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/random_seed22_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-26T00:27:30+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 591.39,
+          "ended_at": "2026-11-26T00:37:21+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2553.74375,
+          "training_p95_jct_s": 6295.699999999998,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.9071875,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.59544259579373,
+          "gpu_real_pct": 84.13931954047825,
+          "gpu_real_running_pct": 84.36016727888217,
+          "training_restarts_total": 1748,
+          "training_jobs_with_restarts": 117,
+          "training_rescale_delay_total_s": 46073.0,
+          "scheduling_decisions": 7274,
+          "scheduling_mean_s": 0.007441710200714875,
+          "scheduling_p95_s": 0.049,
+          "scheduling_total_s": 54.131,
+          "simulated_seconds": 69420,
+          "completed_jobs": 3360
+        }
+      }
+    },
+    "33": {
+      "ats_i": {
+        "metadata": {
+          "run": "ats_i_seed33_r2",
+          "policy": "ats_i",
+          "random_allocate": 0,
+          "seed": 33,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=33 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 0 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/ats_i_seed33_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-26T00:37:21+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 668.67,
+          "ended_at": "2026-11-26T00:48:30+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2442.58125,
+          "training_p95_jct_s": 6751.499999999996,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.835625,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.42166071928352,
+          "gpu_real_pct": 83.45855636020151,
+          "gpu_real_running_pct": 83.67769119087602,
+          "training_restarts_total": 1894,
+          "training_jobs_with_restarts": 92,
+          "training_rescale_delay_total_s": 49612.0,
+          "scheduling_decisions": 7306,
+          "scheduling_mean_s": 0.0092362441828634,
+          "scheduling_p95_s": 0.051,
+          "scheduling_total_s": 67.48,
+          "simulated_seconds": 71460,
+          "completed_jobs": 3360
+        }
+      },
+      "random": {
+        "metadata": {
+          "run": "random_seed33_r2",
+          "policy": "random",
+          "random_allocate": 1,
+          "seed": 33,
+          "seed_mechanism": "PYTHONHASHSEED; controls Python set iteration order; simulator has no explicit RNG call in this path",
+          "command": "PYTHONHASHSEED=33 /home/crazi-grace/miniforge3/envs/pollux/bin/python3.8 -u simulator.py --workload experiment/workload/small.csv --AFE 0 --AISS 1 --ARYL 0 --INFER_SCHEDULER 1 --REPAIR_TRAIN 1 --protect_time 30 --interference 0.0 --interval 60 --min-nodes 16 --num-gpus 4 --random_allocate 1 --policy dp --log_file 0 --output experiment/results/team_experiments/E08_infer_alloc_control/runs/random_seed33_r2/simulator-output",
+          "git_commit": "5a94a70227884c3c72cc772b7e3f221224affb06",
+          "python": "/home/crazi-grace/miniforge3/envs/pollux/bin/python3.8",
+          "started_at": "2026-11-26T00:48:30+05:00",
+          "exit_code": 0,
+          "runtime_seconds": 593.32,
+          "ended_at": "2026-11-26T00:58:23+05:00"
+        },
+        "metrics": {
+          "training_count": 160,
+          "training_mean_jct_s": 2605.15625,
+          "training_p95_jct_s": 6857.25,
+          "inference_count": 3200,
+          "inference_mean_jct_s": 7.87875,
+          "inference_p95_jct_s": 15.0,
+          "gpu_allocated_pct": 94.60302720356015,
+          "gpu_real_pct": 84.54423718776917,
+          "gpu_real_running_pct": 84.7661633290267,
+          "training_restarts_total": 1738,
+          "training_jobs_with_restarts": 113,
+          "training_rescale_delay_total_s": 45780.0,
+          "scheduling_decisions": 7274,
+          "scheduling_mean_s": 0.007453533131701952,
+          "scheduling_p95_s": 0.051,
+          "scheduling_total_s": 54.217,
+          "simulated_seconds": 69660,
+          "completed_jobs": 3360
+        }
+      }
+    }
+  },
+  "summary": {
+    "ats_i": {
+      "training_count": {
+        "mean": 160.0,
+        "sd": 0.0,
+        "min": 160.0,
+        "max": 160.0
+      },
+      "training_mean_jct_s": {
+        "mean": 2442.58125,
+        "sd": 0.0,
+        "min": 2442.58125,
+        "max": 2442.58125
+      },
+      "training_p95_jct_s": {
+        "mean": 6751.499999999996,
+        "sd": 0.0,
+        "min": 6751.499999999996,
+        "max": 6751.499999999996
+      },
+      "inference_count": {
+        "mean": 3200.0,
+        "sd": 0.0,
+        "min": 3200.0,
+        "max": 3200.0
+      },
+      "inference_mean_jct_s": {
+        "mean": 7.835625,
+        "sd": 0.0,
+        "min": 7.835625,
+        "max": 7.835625
+      },
+      "inference_p95_jct_s": {
+        "mean": 15.0,
+        "sd": 0.0,
+        "min": 15.0,
+        "max": 15.0
+      },
+      "gpu_allocated_pct": {
+        "mean": 94.42166071928352,
+        "sd": 0.0,
+        "min": 94.42166071928352,
+        "max": 94.42166071928352
+      },
+      "gpu_real_pct": {
+        "mean": 83.45855636020151,
+        "sd": 0.0,
+        "min": 83.45855636020151,
+        "max": 83.45855636020151
+      },
+      "gpu_real_running_pct": {
+        "mean": 83.67769119087602,
+        "sd": 0.0,
+        "min": 83.67769119087602,
+        "max": 83.67769119087602
+      },
+      "training_restarts_total": {
+        "mean": 1894.0,
+        "sd": 0.0,
+        "min": 1894.0,
+        "max": 1894.0
+      },
+      "training_jobs_with_restarts": {
+        "mean": 92.0,
+        "sd": 0.0,
+        "min": 92.0,
+        "max": 92.0
+      },
+      "training_rescale_delay_total_s": {
+        "mean": 49612.0,
+        "sd": 0.0,
+        "min": 49612.0,
+        "max": 49612.0
+      },
+      "scheduling_decisions": {
+        "mean": 7306.0,
+        "sd": 0.0,
+        "min": 7306.0,
+        "max": 7306.0
+      },
+      "scheduling_mean_s": {
+        "mean": 0.01109695227666758,
+        "sd": 0.002687246733558354,
+        "min": 0.0092362441828634,
+        "max": 0.014177799069258144
+      },
+      "scheduling_p95_s": {
+        "mean": 0.057916666666666665,
+        "sd": 0.009501096427956797,
+        "min": 0.051,
+        "max": 0.06875
+      },
+      "scheduling_total_s": {
+        "mean": 81.07433333333334,
+        "sd": 19.633024635377332,
+        "min": 67.48,
+        "max": 103.583
+      },
+      "simulated_seconds": {
+        "mean": 71460.0,
+        "sd": 0.0,
+        "min": 71460.0,
+        "max": 71460.0
+      },
+      "completed_jobs": {
+        "mean": 3360.0,
+        "sd": 0.0,
+        "min": 3360.0,
+        "max": 3360.0
+      }
+    },
+    "random": {
+      "training_count": {
+        "mean": 160.0,
+        "sd": 0.0,
+        "min": 160.0,
+        "max": 160.0
+      },
+      "training_mean_jct_s": {
+        "mean": 2567.2374999999997,
+        "sd": 33.29034030785055,
+        "min": 2542.8125,
+        "max": 2605.15625
+      },
+      "training_p95_jct_s": {
+        "mean": 6583.5166666666655,
+        "sd": 281.0397762476584,
+        "min": 6295.699999999998,
+        "max": 6857.25
+      },
+      "inference_count": {
+        "mean": 3200.0,
+        "sd": 0.0,
+        "min": 3200.0,
+        "max": 3200.0
+      },
+      "inference_mean_jct_s": {
+        "mean": 7.90375,
+        "sd": 0.023470809663281873,
+        "min": 7.87875,
+        "max": 7.9253125
+      },
+      "inference_p95_jct_s": {
+        "mean": 15.0,
+        "sd": 0.0,
+        "min": 15.0,
+        "max": 15.0
+      },
+      "gpu_allocated_pct": {
+        "mean": 94.63021311319459,
+        "sd": 0.05378968959733611,
+        "min": 94.59544259579373,
+        "max": 94.69216954022988
+      },
+      "gpu_real_pct": {
+        "mean": 84.30535613403266,
+        "sd": 0.21205968925356203,
+        "min": 84.13931954047825,
+        "max": 84.54423718776917
+      },
+      "gpu_real_running_pct": {
+        "mean": 84.52637295407307,
+        "sd": 0.2127656673728571,
+        "min": 84.36016727888217,
+        "max": 84.7661633290267
+      },
+      "training_restarts_total": {
+        "mean": 1755.6666666666667,
+        "sd": 22.50185177565023,
+        "min": 1738.0,
+        "max": 1781.0
+      },
+      "training_jobs_with_restarts": {
+        "mean": 116.33333333333333,
+        "sd": 3.055050463303893,
+        "min": 113.0,
+        "max": 119.0
+      },
+      "training_rescale_delay_total_s": {
+        "mean": 46086.333333333336,
+        "sd": 313.21292012516557,
+        "min": 45780.0,
+        "max": 46406.0
+      },
+      "scheduling_decisions": {
+        "mean": 7274.666666666667,
+        "sd": 1.1547005383792517,
+        "min": 7274.0,
+        "max": 7276.0
+      },
+      "scheduling_mean_s": {
+        "mean": 0.007670642774723513,
+        "sd": 0.0003863291212867497,
+        "min": 0.007441710200714875,
+        "max": 0.008116684991753711
+      },
+      "scheduling_p95_s": {
+        "mean": 0.051,
+        "sd": 0.0019999999999999983,
+        "min": 0.049,
+        "max": 0.053
+      },
+      "scheduling_total_s": {
+        "mean": 55.80166666666667,
+        "sd": 2.8195292751332346,
+        "min": 54.131,
+        "max": 59.057
+      },
+      "simulated_seconds": {
+        "mean": 69560.0,
+        "sd": 124.89995996796796,
+        "min": 69420.0,
+        "max": 69660.0
+      },
+      "completed_jobs": {
+        "mean": 3360.0,
+        "sd": 0.0,
+        "min": 3360.0,
+        "max": 3360.0
+      }
+    }
+  },
+  "paired_differences": {
+    "training_count": {
+      "mean_random_minus_ats_i": 0.0,
+      "paired_differences": [
+        0,
+        0,
+        0
+      ]
+    },
+    "training_mean_jct_s": {
+      "mean_random_minus_ats_i": 124.65624999999984,
+      "paired_differences": [
+        100.23124999999982,
+        111.16249999999991,
+        162.57499999999982
+      ]
+    },
+    "training_p95_jct_s": {
+      "mean_random_minus_ats_i": -167.98333333333085,
+      "paired_differences": [
+        -153.89999999999782,
+        -455.79999999999836,
+        105.75000000000364
+      ]
+    },
+    "inference_count": {
+      "mean_random_minus_ats_i": 0.0,
+      "paired_differences": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inference_mean_jct_s": {
+      "mean_random_minus_ats_i": 0.06812499999999992,
+      "paired_differences": [
+        0.08968750000000014,
+        0.07156249999999975,
+        0.04312499999999986
+      ]
+    },
+    "inference_p95_jct_s": {
+      "mean_random_minus_ats_i": 0.0,
+      "paired_differences": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "gpu_allocated_pct": {
+      "mean_random_minus_ats_i": 0.20855239391106295,
+      "paired_differences": [
+        0.2705088209463611,
+        0.17378187651020482,
+        0.18136648427662294
+      ]
+    },
+    "gpu_real_pct": {
+      "mean_random_minus_ats_i": 0.8467997738311558,
+      "paired_differences": [
+        0.7739553136490684,
+        0.6807631802767418,
+        1.085680827567657
+      ]
+    },
+    "gpu_real_running_pct": {
+      "mean_random_minus_ats_i": 0.8486817631970496,
+      "paired_differences": [
+        0.7750970634343162,
+        0.6824760880061547,
+        1.088472138150678
+      ]
+    },
+    "training_restarts_total": {
+      "mean_random_minus_ats_i": -138.33333333333334,
+      "paired_differences": [
+        -113,
+        -146,
+        -156
+      ]
+    },
+    "training_jobs_with_restarts": {
+      "mean_random_minus_ats_i": 24.333333333333332,
+      "paired_differences": [
+        27,
+        25,
+        21
+      ]
+    },
+    "training_rescale_delay_total_s": {
+      "mean_random_minus_ats_i": -3525.6666666666665,
+      "paired_differences": [
+        -3206.0,
+        -3539.0,
+        -3832.0
+      ]
+    },
+    "scheduling_decisions": {
+      "mean_random_minus_ats_i": -31.333333333333332,
+      "paired_differences": [
+        -30,
+        -32,
+        -32
+      ]
+    },
+    "scheduling_mean_s": {
+      "mean_random_minus_ats_i": -0.0034263095019440664,
+      "paired_differences": [
+        -0.006061114077504433,
+        -0.0024351033771663174,
+        -0.0017827110511614485
+      ]
+    },
+    "scheduling_p95_s": {
+      "mean_random_minus_ats_i": -0.006916666666666668,
+      "paired_differences": [
+        -0.015750000000000007,
+        -0.0049999999999999975,
+        0.0
+      ]
+    },
+    "scheduling_total_s": {
+      "mean_random_minus_ats_i": -25.272666666666666,
+      "paired_differences": [
+        -44.525999999999996,
+        -18.028999999999996,
+        -13.263000000000005
+      ]
+    },
+    "simulated_seconds": {
+      "mean_random_minus_ats_i": -1900.0,
+      "paired_differences": [
+        -1860,
+        -2040,
+        -1800
+      ]
+    },
+    "completed_jobs": {
+      "mean_random_minus_ats_i": 0.0,
+      "paired_differences": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}
