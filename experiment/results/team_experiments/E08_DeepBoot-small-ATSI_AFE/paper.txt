@@ -1,0 +1,1346 @@
+IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023 2553
+DeepBoot: Dynamic Scheduling System for Training
+and Inference Deep Learning Tasks in GPU Cluster
+Zhenqian Chen , Xinkui Zhao , Chen Zhi , and Jianwei Yin
+Abstract —Deep learning tasks (DLT) include training and infer-
+ence tasks, where training DLTs have requirements on minimizing
+average job completion time (JCT) and inference tasks need sufﬁ-
+cient GPUs to meet real-time performance. Unfortunately, existing
+work separately deploys multi-tenant training and inference GPU
+cluster, leading to the high JCT of training DLTs with limited GPUs
+when the inference cluster is under insufﬁcient GPU utilization due
+to the periodic inference workload. DeepBoot solves the challenges
+by utilizing idle GPUs in the inference cluster for the training
+DLTs. Speciﬁcally, 1) DeepBoot designs adaptive task scaling (ATS)
+algorithm to allocate GPUs in the training and inference clusters
+for training DLTs and minimize the performance loss when re-
+claiming inference GPUs. 2) DeepBoot implements auto-fast elastic
+(AFE) training based on Pollux to reduce the restart overhead by
+inference GPU reclaiming. Our implementation on the testbed and
+large-scale simulation in Microsoft deep learning workload shows
+that DeepBoot can achieve 32% and 38% average JCT reduction
+respectively compared with the scheduler without utilizing idle
+GPUs in the inference cluster.
+Index Terms —Deep learning system, distributed training, elastic
+deep learning, GPU cluster scheduling.
+I. I NTRODUCTION
+IN RECENT years, deep learning tasks (DLT) have been
+widely applied in computer vision [1], natural language
+process [2], speech [3]and recommendation systems [4]with
+the help the convenient AI framework [5],[6]. Therefore, DLT
+has gradually become the main workload in the cloud service
+platform and developers usually take Kubernetes [7]or Yarn [8]
+to manage the DLT workload in the data center. To effectively
+manage GPUs in training clusters, multi-tenant deep learning
+training task scenarios are designed from the perspectives of
+scheduling [9],[10],[11],[12], hyperparameter optimization
+(HPO) [13],[14] and heterogeneous resource allocation [15],
+etc. As a task with long execution time, the training DLT focus
+Manuscript received 3 November 2022; revised 30 June 2023; accepted 5 July
+2023. Date of publication 11 July 2023; date of current version 20 July 2023.
+This work was supported in part by Key Research and Development Program
+of China under Grant 2022YFF0902702, in part by the National Nature Science
+Foundation of China under Grant 61825205, and in part by the Key Research and
+Development Program of Zhejiang Provence, China under Grant 2021C01017.
+Recommended for acceptance by S. Chandrasekaran. (Corresponding author:
+Xinkui Zhao.)
+Zhenqian Chen and Jianwei Yin are with the College of Computer Science
+and Technology, Zhejiang University, Hangzhou 310027, China (e-mail: chen-
+zhenqian@zju.edu.cn; zjuyjw@cs.zju.edu.cn).
+Xinkui Zhao and Chen Zhi are with the School of Software Technology,
+Zhejiang University, Ningbo 315048, China (e-mail: zhaoxinkui@zju.edu.cn;
+zjuzhichen@zju.edu.cn).
+Digital Object Identiﬁer 10.1109/TPDS.2023.3293835on optimal resource allocation and fairness. In terms of model
+application, deep learning inference service has been widely
+deployed on the platform as a web online service with high
+requirements for low latency and high throughput. For the in-
+ference service system, existing work has already been studied
+from the perspectives of service level objectives (SLO) [16] and
+cost expenses [17].
+To meet the different needs of training and inference DLTs in
+a multi-tenant cluster, these two types of tasks will be submitted
+to servers with different types of hardware. The training DLTs
+or large language models (LLMs) [18] inference require higher
+performance and large GPU memory, so they will be scheduled
+to the training GPUs (V100, A100) for processing when light
+inference DLTs are usually assigned to inference GPUs such as
+T4 if the memory is sufﬁcient for the models. This deployment
+principle takes the hareware cost into consideration since the
+large memory GPU is more expensive than the inference one.
+Meta [19] has also customized servers with different hardware
+conﬁgurations speciﬁcally for these training and inference tasks
+in their data center.
+However, the deployment of training DLTs in V100 or A100
+and light inference DLTs in T4 lead to insufﬁcient resource since
+DLT workload is diurnal periodicity [20],[21],[22] in training
+deep learning cluster. Meanwhile, the inference cluster faces the
+problem of low utilization ( <40% )[23] in ByteDance due to
+the diurnal trafﬁc pattern [19]. For instance, the inference cluster
+often applies more GPUs for the potential peak workload and
+it causes the waste during the free period. Training DLT also
+shows a similar workload distribution [20] in the Microsoft GPU
+cluster, but these tasks often last for a long time, especially for
+the large models GPT [18] and the elasticity of training DLT
+supports few tasks to utilize the idle GPUs with the faster training
+process. Therefore, unreasonable and unfair allocation scheme
+can lead to some tasks utilize large number of GPUs when the
+remaining tasks without enough resources have to pend in the
+long queues [10]. We propose DeepBoot to manage the lifecycle
+of both training and inference tasks. It means that the idle GPUs
+in inference clusters can be utilized by training DLTs to reduce
+the queuing time and accelerate the training process. Besides,
+training DLT can shrink the scale during the peak period of
+inference load for inference requests.
+In traditional inference service systems, GPU resources are
+occupied by inference service [24],[25] for upcoming requests
+and latest work [16],[17],[26] further expands the scene
+of inference application. But in the training-inference system,
+context switching is unavoidable because of frequent loaning
+1045-9219 © 2023 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.
+See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2554 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+and reclaiming between the training and inference clusters.
+The main concern in this scene is whether inference service
+can meet real-time performance under GPU context switching.
+PipeSwitch [27] pre-initializes the CUDA context to allow paral-
+lel clearing of memory of old task and initialization of new tasks
+which reduces the latency of SLO-sensitive tasks and make it
+possible to realize task switch at the millisecond level.
+Therefore, we can focus on designing a scheduling mecha-
+nism. The principle technique in training management is the dy-
+namic allocation of training resources. The existing multi-tenant
+training system [9],[14] can dynamically adapt the number
+of GPU in intervals (such as 60 seconds in Pollux [14] and
+Chronus [28]). However, challenges arise when directly apply-
+ing these schemes in the training-inference system.
+First, allocating DLTs in the GPU cluster is an NP-hard
+problem since different GPU numbers and distributions can
+seriously affect the training performance. Pollux [14] takes a
+genetic algorithm NSGA II [29] to approximately search for
+the best solution on small scale. However, when combining
+training and inference GPU clusters, the number of workers and
+tasks dramatically increases, leading to the large solution space
+searching. In this case, the genetic algorithm cannot ﬁnd the
+optimal solution effectively with a limited population size. Be-
+sides, the high complexity of NSGA II leads to a non-negligible
+scheduling overhead for upcoming inference tasks, which limits
+the larger population size setting.
+Second, how and when to loan and reclaim the GPUs in the
+inference cluster should be taken into consideration. Improper
+GPU selection for reclaiming can leads to a large efﬁciency loss
+for training DLTs. Besides, an aggressive loaning strategy such
+as utilizing all idle inference GPUs for training DLTs can lead
+to high restart overhead when the conservative strategy cannot
+sufﬁciently utilize the idle resources.
+Third, the distributed training allocation is updated using the
+default “Stop-Resume” strategy. However, this results in high
+overheads for checkpoints, datasets and container lifecycles.
+Elastic training [30],[31],[32] can effectively reduce these high
+restart overheads caused by inference preemption. Current elas-
+tic training framework only record the dataset access progress
+when the allocation changes and default model weights are
+saved at speciﬁed iteration rounds. Pollux uses “Stop-Resume
+by default and saves model weights only when DLT allocation
+changes. This has an advantage that users do not need to cus-
+tomize weight-saving iteration rounds but conﬂicts with existing
+elastic training work on weight management.
+To address the challenges mentioned above, we propose adap-
+tive task scaling (ATS) to cope with the scheduling problem in
+training-inference system. ATS is an efﬁcient dynamic schedul-
+ing algorithm to approximately get the best solution space for
+training DLTs allocation and inference task reclaiming. In ad-
+dition, it manages the lifecycle of a task in training-inference
+system Section IV. Meanwhile, to cope with the high restart
+overhead of training DLTs caused by inference task reclaiming,
+we propose auto-fast elastic (AFE) based on Pollux to achieve
+elastic training. Compared with previous work [31],[32],w e
+make the process of elastic training and checkpoint managementTABLE I
+TRAINING MODELS AND DATASETS USED IN OUREVA L UAT I O N
+of Pollux compatible with stability when updating the allocation
+Section V.
+In general, we design a training-inference joint scheduling
+system DeepBoot . We analyze the challenges and beneﬁt in
+Section II, introduce our methodology with implementation
+in Sections III,IV,V, and VIand ﬁnally evaluate our result
+in simulator and testbed in Section VII. We simulate the 64
+GPUs environment with Microsoft deep learning workload [20]
+and our DeepBoot outperforms the Optimus [12], Tiresias [10],
+AFS [9],A r y l [23] with (2.0x, 1.5x, 1.3x, 6.4x) in average JCT.
+Meanwhile, DeepBoot maintains job efﬁciency but eliminates
+the scheduling overhead in Pollux.
+We list our contributions as follow:rWe propose adaptive task scaling (ATS) scheduling algo-
+rithm, which adapts the scene of training-inference system
+with a large scale workload and ﬁnds the best allocation in
+loaning-reclaiming for DLTs.rWe achieve Auto-fast Elastic (AFE) to implement elastic
+training based on Pollux to avoid the high restart overhead
+in ATS scheduling, which is compatible with checkpoint
+management strategy.rBased on ATS and AFE, we design the training-inference
+scheduling system DeepBoot based on K8s. It manages the
+lifecycles of training and inference tasks together and meets
+the requirements of these two tasks with improvement in
+GPU utilization. We evaluated DeepBoot with a testbed
+and simulator on the Microsoft workload [20] and the result
+shows the superiority of our work. The code is available in
+https://github.com/czq693497091/DeepBoot.
+II. B ACKGROUND AND MOTIV ATION
+In this section, we simulate the scheduling scene in training-
+inference system with an analysis of its challenge and our
+solution.
+A. Problem Analysis
+The information on training DLTs in the workload are shown
+in Table Iand Fig. 1presents the initial lifecycle of training DL
+task with Pytorch deployed by Kubernetes. During the restart,
+training DLTs go through the process of container deletion,
+creation, model initialization, checkpoint loading, etc., which
+takes20∼100 s (Stop-Resume). For most light training DLTs
+(ResNet [1]in Cifar10 [33], NeuMF [4]in MovieLens [34]),
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2555
+Fig. 1. DLT initialization lifecycle of different models. The time cost is
+measured in the process of single container creation and destroy.
+container creation and deleting play the major cost of the restart
+since the dataset is small. As for the larger task such as Bert
+(ﬁnetune) [2]on SQuAD [35] and ResNet in ImageNet [36],
+data loading plays the main part of the restart cost due to the
+large scale of dataset and preprocessing, which takes over 100 s.
+We can note that the high restart overhead is non-negligible
+when the count of allocation updates grows and the current
+training scheduler takes the time interval to adjust the allocation
+of DLTs. However, when the inference workload is introduced,
+frequent allocation updates are unavoidable since inference re-
+quests should be responded to immediately.
+To intuitively present the challenges in training-inference
+system, we build the simulator based on Pollux [37], a small and
+large workload within 8 hours mentioned in Section VII-A with
+8 4 U workers. We make the inference task processing priority
+higher than the training task, which can preempt the GPU of
+training DLTs and can respond immediately. The inference tasks
+are processed in a ﬁrst-come-ﬁrst-served (FCFS) manner and
+randomly utilize the idle GPU in the inference cluster. The
+Pollux uses NSGA II [29] algorithm to schedule the training
+DLTs every 60 s in all the idle GPUs in the training and inference
+cluster. We deﬁne GPU usage as the ratio of Pod allocated with
+GPU to the sum of GPUs. Real GPU usage refers to ratio of
+GPUs used by DLTs for computing (the gradient) to the sum of
+GPUs.
+Fig. 2(a) represents the request arrivals for two scales of
+training/inference loads, with the x-axis being the time (min) and
+they-axis being the number of requests in the current second.
+The detail of workload is introduced in Section VII-A Fig. 2(b)
+shows the GPU utilization and the real GPU utilization when a
+large inference workload is introduced. Due to the high overhead
+of restart time, the real GPU utilization is far from what the GPU
+occupancy shows during the long period of the cluster, despite
+the GPU occupied by Pods reaching 100%, which becomes a
+bottleneck limiting the training efﬁciency.
+Fig.2(c)and(d)show the percentage CDF (cumulative distri-
+bution function) of restart time in the execution time of training
+DLTs and the CDF of restart time, respectively. The x-axis delay
+percent in Fig. 2(c) and(d)means the ratio of total restart cost
+in Fig. 1to the total JCT for each training DLT. We note that the
+Fig. 2. Training-Inference system workload analysis. (a) Workload density.
+(b) GPU usage in training-inference system. (c) CDF of delay percent in JCT of
+training DLT. (d) CDF of delay time.
+proportion of restart time in the execution process of training
+tasks increases signiﬁcantly after the introduced inference load.
+A ss h o w ni nF i g . 2(c), the restart time and execution time become
+longer at the same time after the introduced inference workload.
+Nevertheless, the proportion of restart time increases, and 80%
+of the training task restart time is within 20%. Similarly, we
+observe from Fig. 2(d) that the intervention of inference requests
+inevitably leads to the frequent adjustment of the training DLTs.
+The phenomenon in Fig. 2illustrates that the problem of high
+restart overhead cannot well address at the scheduling level.
+Then, radically reducing the restart overhead exists a tremendous
+beneﬁt for the acceleration of training DLTs.
+In the subsequent chapters in Section II, we will further
+analyze the reasons for these phenomenons in Fig. 2and provide
+our solution with motivation.
+B. Management of DL Cluster
+Inference service GPU cluster faces the problem of low
+GPU utilization due to the diurnal periodicity of inference
+request [19],[23]. Since the deployment of inference service is
+usually one(GPU)-to-one(service) or one-to-many by inference
+scheduling framework [17],[25],[38], a large amount of GPUs
+are left unused in low workload. Although distributed inference
+can fully utilize the multi-GPUs with model or data parallel, it
+is not discussed in this paper since it is usually applied for large
+model [18] or cloud-edge inference collaboration [39],[40].
+Multi-tenant training GPU cluster has a similar workload
+distribution [20],[21],[22]. Nevertheless, the main bottleneck
+of training DLTs is insufﬁcient GPU allocation instead when
+allocation scheme is ideal [14]. The more GPUs means training
+DLTs can increase the distributed training scale (for example,
+from single worker one-GPU to single worker multi-GPUs).
+The elasticity of training DLTs makes it possible to utilize idle
+GPUs in inference cluster. Unfortunately, when to reclaim the
+idle GPUs signiﬁcantly affects the efﬁciency of training DLTs.
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2556 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+For instance, placing the replicas in GPU with a busy inference
+service would lead to frequent allocation updates and high restart
+overhead. Meanwhile, selecting which GPU to reclaim and
+minimize the training efﬁciency effect is also a challenge. To
+be speciﬁc, the performance loss of decreasing one GPU for
+different tasks and different GPU for one task can be observably
+different. As shown in Fig. 2(c)and(d), with the scale increment
+of inference workload, the percent of restart time grows.
+To minimize the inﬂuence of inference reclaiming and maxi-
+mize the utilization of the idle GPUs in the inference cluster,
+our loaning-reclaiming strategy includes the lifecycle of the
+inference GPU and selection scheme. Speciﬁcally, we reserve
+the idle GPUs for inference tasks if the workload is busy and the
+reserved time is related to the number of inference events.
+In addition, the placement of inference tasks is not an NP-hard
+problem since the inference service occupies one GPU. In the
+training-inference system, when allocating inference tasks to
+idle GPUs, we should guarantee that the remaining resources
+can maximize the performance for distributed training. If the
+idle GPUs are used up, we can minimize the reduction of
+metrics, such as GOODPUT [14] orTHROUGHPUT [12] of train-
+ing DLTs when reclaiming. Compared with worker-level re-
+claiming strategy Aryl [23], GPU-level reclaiming can avoid
+potential resource waste. The detailed process is introduced in
+Section IV.
+C. Existing Scheduling Algorithm
+Training DLT can adjust the task scale by setting the number
+of GPUs. Existing DL cluster schedulers, such as SOTA work
+Pollux [14], can adapt the allocation of DLTs according to the
+load of the system and model characteristics. Since allocation for
+training DLTs is an NP-hard problem, Pollux takes the genetic
+algorithm NSGA II [29] to ﬁnd the best allocation for each DLT.
+Its complexity is O(kpn2m2), where k= 100 is the number of
+offspring mating, pis the number of optimization objectives
+(In Pollux p=2 includes SPEEDUP ratio and fairness), nis the
+number of cluster jobs, and mis the number of workers in the
+Pollux solution process.
+Pollux limits the number of workers because larger nleads
+to the larger solution space search and optimize results in this
+situation can be inaccurate under limited k. Meanwhile, an
+interval schedule is not available for inference service, which
+further exacerbates the scheduling problem. The introduction of
+inference DLTs makes the number of jobs ngreatly increase.
+As shown in Fig. 3, with the increase of nandp, the scheduling
+cost is too high to apply in the training-inference system.
+In Pollux, the optimized target is to maximize the sum
+SPEEDUP of all jobs and fair utilization to set the global optimal
+placement scheme. Although it is an NP-hard problem, we can
+replace the genetic algorithm with a heuristic strategy to approx-
+imately satisfy the optimal goal. Optimus [12] takes a greedy
+algorithm to value the beneﬁt when allocating a GPU for the
+training DLT. If the addition does not accelerate the THROUGHPUT
+or the number of GPUs reaches the max GPUs set for this
+job, allocation will be stopped. Unfortunately, THROUGHPUT is
+Fig. 3. Schedul cost of NSGA II with the change of workers and tasks.
+not linear growth. For instance, distributed training in single-
+worker-multi-GPUs training can be faster than multi-workers-
+multi-GPUs if the bandwidth of network is low. In this case, in
+a cluster with 4 U GPU workers, a job taking 4 GPUs in one
+worker can be faster than the one with 5 GPUs in two workers.
+When the number of GPUs continues to grow, a job with 8 GPUs
+in two 4 U workers can be faster than one with 4 GPUs in one
+worker.
+To ﬁnd the trade-off between efﬁciency and accuracy in
+scheduling, Aryl [23] models the scheduling problem as a
+knapsack problem to maximize weighted max-running-time.
+For each job, Aryl stores the number of GPUs as weight and
+weighted execution time in corresponding GPUs as value. Fi-
+nally, it takes the group knapsack algorithm to ﬁnd the max value
+with its allocation. But this strategy is not friendly for the small
+DLTs due to its short execution time and insufﬁcient allocation
+for these tasks will lead to a bottleneck in the cluster.
+Therefore, it is available to abstract the scheduling problem
+as a knapsack algorithm like Aryl with a better optimization
+target, such as SPEEDUP in Pollux [14]. This metric balances
+the efﬁciency and throughput, which is fairer to DLTs with
+different scales. With the low complexity knapsack algorithm,
+the allocation result can be more stable on large scale and we
+can overcome the scheduling overhead in the training-inference
+system. In Section IVwe show the details of how we model the
+scheduling process as a knapsack problem while maintaining
+training efﬁciency.
+D. Beneﬁts of Fast Elastic Training
+In the training-inference scheduling system, frequent schedul-
+ing is unavoidable since training DLTs need to release the GPU
+immediately when an inference request comes. It inevitably
+leads to the frequent adjustment of training DLTs. We further
+analyze the allocation change in the simulator shown in Fig. 4,
+where the x-axis prev _alloc is the number of GPUs used by the
+job before the resource update and y-axis curr _alloc updated
+GPU number. We use y=xto divide the allocation state, where
+the scatters above y=xare resource expansion when those
+below are contraction. For instance, the job originally used 4
+GPUs on 4 workers. After the allocation, 2 GPUs on 1 worker
+are used (because the communication speed between GPUs
+is greater than the communication speed between workers, so
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2557
+Fig. 4. Training DLT resource allocation variation. Left: Train workload;
+Right: Train workload with large inference workload.
+many resource updates exist from time to time). The position of
+the scatter in the ﬁgure indicates the change of prev _alloc→
+curr _alloc locating in (4,2). The size of the scatter indicates the
+number of change times for all training DLTs, with the larger
+indicating the more times it occurs. Also, we record the time
+between each resource allocation and the shorter the interval,
+the more frequently the resources are updated with the darker
+the color.
+From Fig. 4, we conclude that a larger workload leads to more
+allocation update events. Besides, the number and frequency
+of resource allocation changes around y=xare large, which
+implies that the amount of GPU allocation changes ΔGPU is
+small for the majority of resource allocation changes. It proves
+that unreasonable utilization time of inference GPUs for training
+DLTs will result in frequent restarts. In addition, remaining
+replicas are the majority of part to continue running and fast
+elastic training can beneﬁt the training process.
+Fast elastic training is proposed to reduce the overhead impact
+for the remaining replicas in distributed training. Recent works
+such as Elan [30] and EDL [32] mandate that users specify
+the number of iterations for saving checkpoints. This method
+offers the advantage that when there is a change in the number
+of elastic training members, all replicas involved in distributed
+training only need to synchronize their progress with respect to
+accessing the current data set. After scaling up, newly added
+replicas or remaining replicas after scaling down can continue
+with distributed training by synchronizing their access progress
+to the data set. In general, this checkpoint saving approach
+incurs overhead only in terms of data synchronization and can
+theoretically be achieved at a millisecond level.
+But the disadvantage of Elan/EDL is determining appropri-
+ate iteration intervals for saving checkpoints. Particularly with
+larger model [18], the cost of saving checkpoints cannot be
+ignored. Saving at low iteration will increase training overhead,
+while saving at high iteration rounds will require loading older
+model weights during elastic training phase, leading to wasted
+iterations and reduced efﬁciency. CheckFreq [41] discusses this
+problem, but this checkpoint management is not compatible with
+the management in Pollux.
+uses a “Stop-Resume” approach and a checkpoint manage-
+ment strategy that involves compromise. The model weights
+are saved only when the number of replicas changes and then
+Fig. 5. The overall system architecture. The pink modules represent the
+inference task with its work and data ﬂow. The blue modules represent the
+training tasks. Each row in the cluster represents a worker, and each worker in
+this ﬁgure contains 4 GPUs.
+progress of dataset access is recorded. When all replicas need
+to be synchronized, the previously saved weights are reloaded
+once again. This saves users from manually setting iteration
+intervals and eliminates overheads associated with synchroniz-
+ing and saving weights during training. However, this strategy
+means that there will be an overhead for weight saving when
+there allocation updates during elastic training, which is usually
+second level.
+The variation in managing checkpoints necessitates distinct
+management of the replica lifecycle while allocating updates.
+This becomes particularly crucial when introducing inference
+load, as it is imperative to ensure proper synchronization of
+weights during second-level switching. To facilitate elastic train-
+ing under this checkpoint management mode, DeepBoot em-
+ploys auto-fast elastic (AFE).
+III. D ESIGN
+DeepBoot is a DLT scheduler based on Kubernetes [7],[42],
+which implements the management of lifecycle for training and
+inference DLTs. Fig. 5illustrates the system architecture.
+We use SPEEDUP [14] to measure the efﬁciency of train-
+ing DLTs and use periodic interval scheduling with adaptive
+task scaling (ATS-T). ATS-T models the scheduling strategy
+as a knapsack problem to maximize the SPEEDUP for each
+job. Resources are allocated and updated for training tasks not
+completed at the speciﬁed period 1⃝. The scheduler will allocate
+the idle GPUs for DLTs to adjust their scale 2⃝, where the GPUs
+in the training cluster will be assigned ﬁrst and then the ones in
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2558 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+the inference cluster. If idle GPUs are in the cluster, training
+DLTs will be pended until the next scheduled interval.
+We synchronize the state information of replicas in train-
+ing DLTs through Redis [43], which is running in the back-
+ground 3⃝. The details of the implementation are described in
+Section V.
+To meet the real-time requirements of the inference task, the
+controller immediately responds to the request to the inference
+scheduler a⃝with adaptive task scaling inference (ATS-I). For
+the GPUs in the inference cluster, the scheduler assigns the
+inference task to the GPU in the PROTECT state reserved for the
+inference task ﬁrst. Otherwise, the scheduler places the inference
+task on the FREE GPU. When both PROTECT andFREE GPUs
+are used up, the inference task reclaims the GPUs occupied by
+training DLTs b⃝. Finally, the state of the inference task in the
+cluster is updated to controller c⃝, where the state of the GPU in
+the inference cluster includes FREE ,PROTECT , and RUN phases
+will be discussed in Section IV-B .
+In the scenario of this article, we ensure that each inference
+model can be run on a single inference GPU. For the large model
+needed distributed inference support, ATS-I can be invoked
+multiple times to schedule or reclaim a speciﬁed number of
+GPUs to meet the requirements.
+IV . A DAPTIVE TASK SCALING
+Adaptive task scaling (ATS) includes ATS-Training (ATS-T)
+and ATS-Inference (ATS-I) and they manage the scheduling of
+training and inference DLTs.
+A. ATS-T
+We simplify the optimization target in Pollux [14] to
+maximize the FITNESS in(1), where the SPEEDUP =
+GOODPUT(θ)/GOODPUT(θ0)is the ratio of GOODPUT with current
+parameters set θincluding allocation, batch size and accumula-
+tion steps and the one with initial θ0.GOODPUT is the metric in
+Pollux to measure the quality of the training DLTs. GOODPUT
+is the product of THROUGHPUT andEFFICIENCY , where the
+THROUGHPUT represents the data processing capacity in per unit
+time and EFFICIENCY reﬂects the contribution of each batch
+size unit to the global training. In solving the optimization
+process, we refer to Aryl’s idea of knapsack modeling and the
+number of GPUs that can be allocated to the job from 1 to
+job.max _replicas as the weight for each allocation when the
+value is the speedup to the corresponding number of the replica.
+This problem is consistent with the deﬁnition of group
+knapsack problem [44]. We treat all feasible allocations of
+a training DLT as a set of items and only one allocation
+can be chosen. For example, a DLT jcan be allocated
+with(1,2,...,j . m a x _replicas)with corresponding SPEEDUP s
+(s1,s2,...,s max _replicas). In the group knapsack problem, we
+can choose one case for jwith the allocation as weight Ajand its
+SPEEDUP jas value. The backpack capacity is the total number
+of GPUs available in the cluster. Finally, we solve the allocation
+Fig. 6. An example of replicas to allocations including 3 tasks with 1, 2 and
+4 GPUs. The black sketched GPU is occupied by the unchange allocation.
+scheme for the maximum FITNESS in Algorithm 1.
+FITNESS(A)=J∑
+jSPEEDUP j(Aj) (1)
+We show our pre- and post-processing for the knapsack
+problem in Algorithm 2.SPEEDUP is based on the allocation
+of jobs rather than the replica number in the knapsack problem.
+Speciﬁcally, we expect parameters like [3,3] (2 workers with
+3 GPUs) or [2,2,2] (3 workers with 2 GPUs) instead of only a
+number. Therefore, we make an optimal speedup assumption,
+where all the GPUs under the current number will be allocated
+to as few workers as possible. If GPUs in one worker are used
+up, we ﬁnd the next worker to allocate. The example of a job
+with 6 GPUs will be allocated with [4,2] in 4 U GPU worker
+(Algorithm 2line 25).
+In addition, we follow Pollux’s penalty mechanism for jobs
+that frequently restart and introduce penalty factors related to
+the execution time and the number of restarts (Algorithm 2, line
+27). In this way, training DLTs can avoid unnecessary allocation
+update if the new allocation beneﬁts enough.
+However, results got by the knapsack algorithm cannot be
+directly applied in allocation and we need to transform the
+number into GPUs on each worker. The principle of allocation
+is to prioritize the unchanging allocation and leave priority to
+place job replicas on workers with the least free GPUs to satisfy
+the requirements (Algorithm 2, function Replica2Allocation)
+shown in Fig. 6.
+The complexity of group knapsack is capped at O(nm2),
+where nis the number of jobs and mis the total number of
+GPUs. Meanwhile, the third layer loop of group knapsack falls
+far short of m(Algorithm 1Line 7) and the execution speed is
+dramatically improved compared to NSGA II with O(kpn2m2)
+complexity.
+B. ATS-I
+We deﬁne the lifecycle and scheduling process for the in-
+ference task shown in Fig. 7. GPUs in the inference cluster
+occupied by the training tasks are marked as TRAIN , and the
+rest are initially FREE . After executing the inference task, the
+FREE GPU state switches to RUN. If multiple inference tasks are
+supported to run in parallel, such as TensorFlow serving [24],
+this state will turn to RUN until the GPU can no longer handle
+more inference requests. After the inference task is ﬁnished, the
+state turns to PROTECT from RUN, where GPUs in the two states
+cannot be loaned by the training DLTs. The PROTECT state is
+reserved for the potential upcoming inference request to avoid
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2559
+Algorithm 1: GroupKnapsack.
+1Function GroupKnapsack (WeightsW,ValuesV,
+Total Resource M):
+2N←Number of training DLTs
+3dp[N+1][ M+1]; ⊿Initialize solution space
+4fori=1→Ndo
+5 forj=M→1do
+6 dp[i][j]=dp[i−1][j];
+7 fork=0→W[i].len−1do
+8 ifj≥W[i][k]then
+9 dp[i][j]=m a x ( dp[i][j],
+10 dp[i−1][j−W[i][k]]+V[i][k])
+11R← Path of dp ⊿Replica number for each job
+12returnR
+13End Function
+Fig. 7. Lifecycle of the inference GPU and an example of inference task
+allocation. C-x is the execution time in PROTECT . Jx is the index of training
+DLT.
+frequent loaning and reclaiming. After the protection time is
+over, the GPU state is released from PROTECT toFREE .W es h o w
+the lifecycle of the inference GPU in Fig. 7.
+We expect that with guaranteed quality of service, the infer-
+ence task can be delivered on a few GPUs as possible. Therefore,
+when an inference request arrives, the GPU with PRORECT state
+is allocated ﬁrst to satisfy the inference request. If there are
+many PROTECT inference GPUs, we previously record protected
+times g.cnt of inference GPUs and the one with the largest
+g.cnt is selected and g.cnt is increased. The g.cnt are positively
+correlated with the protection time of the GPU (Algorithm 3,
+Line 6-7). The protection time starts counting after the inference
+task is ﬁnished, so ATS-I does not need to estimate the execution
+time of the inference DLT.
+The inference task tends to select the inference GPU with
+larger g.cnt for execution, which can make the inference GPUs
+with smaller g.cnt enter the FREE state as soon as possible.
+After the protection time is over, the GPU enters the FREE with
+initialization of g.cnt and the protect _time in the PROTECT
+state (Algorithm 3, Line 7-8).Algorithm 2: ATS-T.
+Input
+P: Previous allocations
+J: Training jobs
+N: Available GPUs in each worker
+Output :
+A: GPUs in each worker for every training DLT
+1Function Replica2Allocation (P,J,R,N):
+2 ⊿Allocate the number of GPUs in each worker for
+every job.
+3 job_names =SortJobByReplicaNumIncrease( J,R);
+4A← select the unchanged allocation in P
+5F←N−A ; ⊿Remaining free gpus
+6 forj∈job_names do
+7 ifR[j]= =0 orj∈Athen
+8 continue;
+9A[j]=[ ]
+10 whileA[j].len <R[j]do
+11 worker, cnt ←Worker with max free GPUs in F
+12 ifR[j]-A[j]. l e n<c n t then
+13 worker, cnt ←W o r k e rw i t hm i nf r e eG P U s
+≥cntinF
+14 A[j].extend([worker]∗cnt)
+15 F[worker]-=cnt
+16 returnA
+17Procedure ATS-T (P,J,R,N:)
+18 M←Sum of available GPUs in N
+19W= [[]] ,V= [[]] ⊿Start index from 1
+20 forj∈Jdo
+21 wt=[ ],vt=[ ]
+22 f=(j.age−j.restart ∗delay)/(j.age+delay)
+23 forw=1→j.max _replicas do
+24 wt.append( w)
+25 speedup =j.speedup( w)
+26 ifw̸=P[j.name].lenthen
+27 speedup *=f
+28 vt.append( speedup )
+29W.append( wt),V.append( vt)
+30R=GroupKnapsack (W,V)
+31A=Replica2Allocation (P,J,R,N)
+32 returnA
+Finally, in the absence of PROTECT andFREE state GPUs,
+the GPUs occupied by the training DLTs are reclaimed. In the
+reclaiming phase, the GPUs occupied by the training DLTs are
+enumerated. Since reclaiming GPUs causes ΔSPEEDUP <0in
+most cases, we choose the result with the least impact, where
+ΔSPEEDUP is the largest. There may be results of ΔSPEEDUP >
+0after removing GPU, such as allocation update from [4,1]
+to [4], migrating from multi-workers-multi-GPUs to single-
+worker-multi-GPUs, our selection strategy in this case is equally
+adapted.
+The ATS-I algorithm will be executed multiple times in an
+inference scheduling scenario, with the number of executions
+being equal to the required number of inference GPUs.
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2560 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+Algorithm 3: ATS-I.
+Input :
+S: GPUs in inference cluster
+PI: Previous allocations of training DLT in inference
+cluster
+Output :
+g: selected GPU for inference task
+1Function updateGPUState (GPU g):
+2 ifg.state==PROTECT then
+3 g.cnt ++
+4 else
+5 g.cnt=0
+6 tp=tp,min+g.cnt∗interval
+7 g.protect _time=m i n ( tp,max ,tp)
+8 g.state=RUN
+9End Function
+10Function ATS-IS,PI:
+11H← select PORTECT state GPUs in S
+12 ifH/∈∅then
+13 g←select gpu with max g.cnt inH
+14 else
+15 worker←select worker with min FREE gpus inS
+16 ifworker /∈∅then
+17 g←random select the FREE gpu in worker
+18 else
+19 ⊿Preempt a GPU from PIand minimize the
+affect for training DLT
+20 g←argmaxΔ SPEEDUP(PI)
+21 update _gpu_state(g)
+22 return g
+23End Function
+Fig.7shows how the 6 inference requests are allocated when
+they arrive. The GPU with long protection time is reclaimed
+upon arrival of inference requests, after which GPUs on workers
+with fewer FREE GPUs are reclaimed. Finally, for the 3 GPUs
+that are occupied by the training DLTs, one GPU of J1 is
+reclaimed to reduce the impact on FITNESS .
+Overall, the complexity of inference selection is O(mr),
+where mis the number of GPUs in the inference cluster with
+rbeing the number of GPUs requested. Compared to Aryl’s
+worker-based reclaiming strategy, GPU granularity recycling
+minimizes the impact on the training DLTs.
+V. A UTO-FASTELASTIC
+In Pollux, the controller sends the latest allocation results to
+each member of the distributed training. Dataparalle of Pytorch
+divides the data and distributes it to multiple GPUs. Once each
+replica ﬁnishes its iteration, dataparallel gathers and combines
+the outcomes to update the model parameters. Then, the dat-
+aloader and dataparallel are reloaded using “Stop-Resume” after
+allocation updates as shown in the ﬁrst row of Fig. 8.E D L [45]
+and Elan [30] only need to adjust the synchronization when
+allocation updates as shown in the middle row of Fig. 8with
+the highest efﬁciency. AFE needs to introduce the extra cost of
+Fig. 8. Illustraion of scaling up and down in stop-resume, Elan/EDL and AFE
+for training DLTs.
+Listing 1. Implementation of AdaptdlTrainer.
+“Save state” and “Load state” to be compatible with checkpoint
+management in Pollux, as shown in Fig. 8.
+Controller: In DeepBoot, we update the parameters involved
+in all-reduce, including the number of GPUs assigned to the
+current job, the port number, and the rank of distributed training
+when allocation changes. Meanwhile, unchanged Pods will con-
+tinue to run in their original running state. As for the newly added
+or deleted replicas, the controller maintains its origin lifecycle.
+DL Framework: DeepBoot inherits the AdaptdlTrainer class
+and implements the run method with our program. For data
+that need to be loaded only once, such as model initialization,
+weights, datasets, etc. are implemented in the __init__ method.
+The parts that need to be constantly updated, such as dat-
+aloader, accumulator, and dataparallel (recording the parameters
+related to the distributed training state) are placed inside the run
+function. AdaptdlTrainer implements state updates, controller
+interactions, and initialization synchronization of the remaining
+replicas in the distributed training in runfunction. The execute
+function encapsulates all the modules of AdaptdlTrainer . A case
+of AFE is shown in Listing 1, where the API style refers to the
+AdaptDL [46] and TorchElastic [47].
+Grow: When the controller sets up the training DLT expan-
+sion, it will create a new Pod and set a sync ﬂag for this Pod with
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2561
+an initial state of creating. After completing the __init__ func-
+tion including datasets, checkpoint loading, and initialization, it
+waits for the old Pod to synchronize with the sync ﬂag as ready.
+If all sync ﬂags of new Pods are ready, we stop the iteration of
+the dataloader. If the Pod is the master with rank=0, the Pod
+is responsible for saving the state of the current training DLTs,
+including the dataloader (training progress indicators), modeling
+hyperparameters, etc. After completing the above operations, the
+current sync ﬂag of corresponding Pods turns to ready. Then all
+the Pods load the latest state and start network synchronization
+for the next round of training.
+Shrink: When the training DLT receives a signal to shrink
+the scale, the controller reassigns the rank for replicas. Pods
+that do not appear in the new allocation are deleted directly
+when the remaining ones continue the synchronization. Pod with
+rank=0save the state as same as Grow . When all the sync ﬂags
+are ready, they turn to the distributed training communication
+construction. Since inference GPU recycling may occur in a
+short period to reclaim GPUs several times, we ensure that
+Pods with rank=0 are in the worker with the most number
+of replicas. It makes Pods not easily to be reclaimed by the
+inference job and we can avoid interruptions to guarantee the
+checkpoint saving.
+Fault tolerance: We save the weight of models with their
+version in speciﬁc iteration steps and the newly added replicas
+will load the latest checkpoint to synchronize training. To pre-
+vent the potential problem of checkpoint or state loss in storage
+or other abnormal problems, DeepBoot will check whether the
+checkpoint or state ﬁles are valid. Then training DLTs load the
+latest and available version.
+In addition, elastic distributed training is subject to deadlock
+in rare cases, which may occur with changes in allocation
+between distributed communications. The dataloader updates
+therunﬂag after each iteration, and the controller checks the
+execution tasks in iteration with a certain time interval. The
+controller will restart the DLT with “Stop-Resume” if there is a
+deadlock in the time interval.
+AFE implements a checkpoint management mode for the
+Pollux scenario that allows elastic training. This mode handles
+the lifespan of replicas involved in elastic training and takes
+into account the dependability of checkpoint preservation when
+inference workload is introduced.
+VI. I MPLEMENTATION
+Scheduling: The DeepBoot scheduler is implemented based
+on Kubernetes [7]with algorithm ATS (Algorithms 2and3).
+For training DLTs, scheduling is performed at an interval of
+60 seconds to update the allocation and the hyperparameters
+related to GOODPUT for the current conﬁguration case. Requests
+for inference GPU usage are responded to immediately upon
+arrival. When the inference task reclaims the GPUs loaned by
+the training DLT, there may be a problem that the training DLT
+is executed too short under the current conﬁguration, leading to
+the inaccurate collected throughput. Therefore, hyperparameters
+related to GOODPUT do not update when GPUs are reclaimed.In our experiments, we treat the inference request as a re-
+claiming event. We also do not support the execution of multiple
+training and inference tasks on one GPU. It avoids the training
+DLTs being less efﬁcient and guarantees the execution latency
+of inference tasks.
+Elastic Training: At the system level, the controller is respon-
+sible for the synchronization of the Pods’ state corresponding to
+each job in the AFE module and the management of the lifecycle.
+We use Redis [43]to record the state of the Pods corresponding to
+the training DLT. The controller updates the job state to the Redis
+server after scaling up and down. The introduction of AFE results
+in Pods under one training DLT may be in different states. To
+achieve consistency, the Pods of one training DLT communicate
+directly with the Redis-server instead of the controller, which
+conﬁrms each other’s execution state to achieve synchronization
+and reduces the load request handled by the controller.
+At the framework level, we implement AFE on Pytorch [5]
+with all-reduce. Meanwhile, the elastic training state and metric
+follow the standard of PolluxAgent [37]. We mainly modify the
+dataloader in the Pytorch so that it can respond to the information
+passed by the controller.
+VII. E VA L UAT I O N
+A. Setup
+Workload: On the simulated workload, we use 160 training
+tasks of Pollux [37] drawn from the Microsoft deep learning
+cluster [20] as shown in Table Ias training workload. The
+NeuMF [4]does not have the restart time with AFE since the max
+replicas for this task are one. For the inference task, we perform
+simulations of GPU reclaiming preemption events in the range
+of 16 h, so that the training DLTs are perturbed by the inference
+task during execution. We divide the inference load into 3 sizes:
+Small:(10×,10), Middle: (50×,20)and Large: (100×,30).
+We take the small workload as an example, where the number
+of inference tasks is 10 times the number of training tasks, and
+the execution time of each inference task is randomly distributed
+from 1 to 10 seconds. Workload of three scales includes same
+training workload and different inference workload.
+We support elastic training by default for all training tasks.
+In the testbed experiments, limited by network bandwidth and
+device size, we remove the ImageNet tasks from the simulator
+workload, while reducing the number of training and inference
+DLTs to 1/4 of the original one, in addition to reducing the ﬁnal
+training epoch of the training DLTs to 1/2 of the original one.
+Simulator: We build a discrete-time simulator based on Pol-
+lux. The number of 4 U workers is 16, where 8 workers are
+training workers and others are inference workers. The schedul-
+ing interval for training tasks is 60 seconds. As for inference
+events, we check the request state at one-second intervals and
+decide the allocation according to the GPU allocation. For each
+inference task, the number of replicas is 1.
+Testbed: The test cluster consists of 8 GPU workers, where
+we divide 4 workers as a training cluster and others as an
+inference cluster in the same zone. Each worker has 2 P40 GPUs
+with 22 GB GPU memory, the 48-core processor with 256 GB
+memory in Ubuntu 18.04. We use NFS with a network bandwidth
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2562 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+Fig. 9. Average JCT of different scheduler in different workload scale in
+simulator.
+of 10 GB/s to store the checkpoint and dataset. Besides, we use
+Kubernetes [42] in version 1.18.2.
+Method: Our comparison is divided into two dimensions:
+training and inference scheduling. We compare ATS-T with
+recent works, including Optimus [12], Tiresias [10],A F S [9],
+Pollux [14], and Aryl [23], where we brieﬂy introduce the
+compared algorithms in Section VIII. The scheduling algorithms
+above are heuristic algorithms except for Pollux. The heuristic
+algorithm moves the GPUs occupied and protected by the infer-
+ence task out before the GPU allocation for the training DLTs.
+Pollux uses NSGA II to treat the number of workers nand the
+number of GPUs min each nod as a m×nallocation matrix.
+To ensure that the inference task is not preempted by the training
+DLTS in the NSGA II allocation, we assign high weights to the
+inference tasks.
+Comparison of inference scheduling contains random pre-
+emption, Aryl, and our ATS-I. Random preemption is the ran-
+dom assignment of an inference request to a free GPU or the one
+occupied by training DLTs upon arrival. Aryl is a worker-level
+reclaiming algorithm that prioritizes the workers involved in
+the minimum number of training DLTs. ATS-I is a GPU-level
+reclaiming to minimize the SPEEDUP impact on training DLTs.
+For the baseline, we artiﬁcially divide half of the training
+workers (8 workers with 32 GPUs in total) to handle only training
+DLTs and half of the inference workers for inference tasks. It
+means that for baseline experiment, only half of the workers can
+handle the training DLTs. The training DLT is scheduled with
+Pollux and the inference task is ATS-I. For the inference GPU
+protection time setting in Algorithm 3,w es e t tp,min=3 0 s,
+interval =1 5 s, and tp,max= 120 s.
+In other experiments, without special instructions, the train-
+ing scheduling algorithm uses DeepBoot’s ATS-T with AFE,
+and inference scheduling uses ATS-I scheduling as well as its
+lifecycle management.
+Metric: We mainly use average JCT to evaluate the training
+task efﬁciency, queue time to show the hanging time of training
+DLTs, and makespan to represent the overall efﬁciency of system
+operation.
+B. Simulator Experiment
+Comparsion of Baseline: As shown in Fig. 9, the average JCT
+of baseline is higher than other methods except Optimus in small
+workload since large number of idle GPUs can be utilized byATS-I to accelerate the training process. When workload turns
+from small to large, the beneﬁt got by ATS-I decreases because
+inference GPUs are busy for the inference DLTs. Compared
+with baseline, DeepBoot reduce 38% average JCT reduction in
+middle inference workload.
+Comparsion of DL Scheduler: We show the average JCT of
+different scheduling algorithms in different workload scales in
+Fig. 9. Compared with Optimus, Tiresias, and AFS, DeepBoot
+improves efﬁciency in (2.0x, 1.1x, 1.1x), (2.0x, 1.5x, 1.3x),
+and (1.9x, 2.1x, 1.4x) in small, middle and large workload
+scales respectively. Optimus takes the reduction of the remaining
+completion time of the current training DLTs with the addition of
+a new GPU as the priority to allocate the GPU. It leads to a higher
+priority of assigning more GPUs to tasks with longer execution
+times and possibly fewer GPUs to smaller jobs. In addition,
+Optimus limits the max replicas for each training DLTs, leading
+to low GPU utilization when the cluster is idle. Tiresias does
+not support elastic scaling, and jobs will be suspended when
+there are not enough GPUs left to satisfy the current job. This
+results in jobs that require a large number of GPU tasks, such
+as ImageNet and Bert, potentially hanging due to insufﬁcient
+GPUs after being reclaimed away by the inference task, and also
+leaves the cluster GPU resources underutilized. The heuristic
+algorithm AFS uses the strategy of allocating GPUs as much
+as possible, lifting the limitation on the maximum number of
+GPUs for a job. It uses the incremental ratio of throughput as
+the basis for scheduling and assigns GPUs to the jobs with the
+largest incremental ratio of throughput in priority. Therefore, it
+outperforms Optimus based on throughput modeling in terms
+of results. However, increasing the throughput can lead to a de-
+crease in statistical efﬁciency due to unnecessary traversals [51].
+We also compare it with Aryl’s training scheduling algorithm,
+which predicts the maximum required runtime for a job and uses
+the weighted maximum runtime as a factor based on the number
+of GPUs as the value of the backpack problem. This orientation
+causes the GPUs to be assigned preferentially to large tasks with
+long execution times like Optimus. As a result, the average JCT
+of Aryl is 6.4x larger than DeepBoot in the middle workload.
+Both Pollux and DeepBoot aim to ﬁnd the maximum SPEEDUP
+in the cluster, while Pollux allocates directly based on the
+worker-GPU matrix, which can fully enumerate the solution
+space and takes fairness of allocation into consideration. There-
+fore, Pollux can achieve accurate modeling slightly faster than
+DeepBoot at small and middle workload scales. DeepBoot uses
+the knapsack algorithm to approximately get the allocation in
+Pollux. Under the large scale workload, the increase in solution
+space makes Pollux unable to obtain the optimal solution in a
+limited number of mating rounds, and thus DeepBoot is slightly
+faster than Pollux.
+The training efﬁciency is also reﬂected in the GPU utilization
+and we analyze the resource usage in different workload scales
+with the different schedulers in Fig. 10. The baseline shows
+a gradual increase in utilization in the ﬁrst 16 hours as the
+inference load size increases from a GPU utilization perspec-
+tive. At the same time, Pollux improves efﬁciency signiﬁcantly
+over baseline by utilizing inference cluster GPUs. Optimus and
+Tiresias constrain the max replicas limit of the submitted job,
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2563
+Fig. 10. GPU utilization analysis. Top-Middle-Bottom: Small-Middle-Large
+scale workload.
+Fig. 11. Schedule cost analysis. (a) CDF of scheduling cost. (b) Makespan of
+different scheduling algorithm in small, middle and large scale workload.
+so it can be underutilized when the number of jobs is small
+or the total number of GPUs is large. AFS prefers to allocate
+all available GPUs when scheduling, where the over-allocation
+leads to training DLTs being frequently reclaimed by inference
+tasks and low utilization due to the suspended state. Pollux
+and DeepBoot gently increase the max number of replicas by
+powers of 2 with a penalty factor to avoid unnecessary restarts.
+Therefore, GPU usage in Pollux and DeepBoot is stable and
+high.
+Pollux Scheduling Cost: From the analysis in DL scheduler,
+we can see that Pollux and DeepBoot maintain approximate
+performance due to their similar optimized target. Unfortunately,
+real-time performance and scale of cluster and tasks limit the
+application of NSGA II in Pollux. As shown in Fig. 11(a) is the
+CDF of the inference schedule cost by Pollux. We can see that
+with the increment of workload scale, the percentage of high
+schedule costs grows. In the large workload, 20% takes more
+than 4 seconds to decide the allocation for inference task and
+some schedule cost even reach over 10 seconds in all scales of
+workload. As shown in Fig. 11(b) , we analyze the makespan of
+the different schedulers. Although the makespan cannot simply
+equal the sum of execution of training DLTs and scheduling costsince there are overlaps between them, the obvious difference
+between Pollux with other scheduling algorithms at the millisec-
+ond level is unacceptable.
+Beneﬁt by AFE: We analyze the beneﬁt of AFE shown in
+Fig. 12.I nF i g . 12(a) , we can see the decrease of JCT is not
+obvious with AFE since the protection mechanism in ATS-I
+avoids the frequent allocation update for training DLTs. At the
+same time, small training DLTs make up the majority of our
+loads, and the protection mechanisms are not a signiﬁcant boost
+for small tasks with short execution times (NeuMF and ResNet
+in Cifar10 take over 70% in the workload). For the large task
+such as ResNet in ImageNet and Bert occupying a large number
+of GPUs, the acceleration of large workload is more obvious
+from 1.2x in 50ile% to 1.7x 95ile% compared with the method
+without AFE. As shown in Fig. 12(b) and(c), the delay percent
+in total execution time decrease and GPU utilization greatly
+improves with the help of AFE, which explains that restart
+overhead reduces and training efﬁciency improves.
+Protection Time: In ATS-I, we introduce ﬂexible protection
+time to avoid frequent loaning-reclaiming between training and
+inference DLTs. As shown inFig. 13, the 0 in the x-axis means
+no protection state is introduced and the GPU is placed in the
+idle state immediately after the inference task ﬁnishes. 2x is the
+doubled protection time in Algorithm 3. The unprotected case
+results in a larger average JCT for training due to preemption.
+The increase in protection time can circumvent the preemption
+when the increase in protection time also leads to idle inference
+GPUs not being utilized in time. As the protection time increases,
+the average JCT becomes larger.
+Inference Schedule Algorithm: In Fig. 14, we show the impact
+of different inference GPU reclaiming strategies. We can see that
+random reclaiming causes an increasing impact on the training
+DLTs as the workload scale increases because it does not take
+into characteristics of the training DLTs into consideration. As
+for Aryl’s strategy, we note that it leads to inferior results to
+random reclaiming at middle workload than at GPU granularity
+because of its coarse granularity. In addition, Aryl’s worker-
+level recycling does not differ much from ATS-I’s GPU-grained
+recycling in terms of results. This is because worker reclaim-
+ing brings some free GPUs available for processing inference
+requests, circumventing potential future reclaiming.
+textbfLarge scale training: At the same number of training
+DLTs, on small, middle, and large scales with different inference
+task sizes, Pollux and DeepBoot have similar JCTs. Therefore,
+the scheduling metric SPEEDUP is also similar.
+The performance difference between DeepBoot and Pollux
+will only be reﬂected when the training cluster and task scale
+increase. To demonstrate the superiority of DeepBoot over Pol-
+lux in a pure training scenario, we prove that Pollux’s genetic
+algorithm is not competent for correct scheduling under large-
+scale clusters and tasks. In the simulator, we only schedule pure
+training tasks and increase both the number of training tasks
+and GPU workers by 10 times (1600 training DLTs and 160 4 U
+workers), with results in Fig. 15.
+In the large-scale training scenario, the average JCT of Deep-
+Boot’s DLTs is 1.25x faster than Pollux as shown in Fig. 15(a) .A t
+the same time, since both DeepBoot and Pollux are optimized for
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2564 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+Fig. 12. AFE analysis. (a) Average, 50%ile, 75%ile and 95%ile JCT speedup when AFE is introduced. (b) CDF of pending time percent in execution time in
+different scale workload. The dotted lines are the result with AFE. (c) GPU utilization comparsion between w/ and w/o in large scale workload.
+Fig. 13. Protect time analysis.
+Fig. 14. Inference schedule algo-
+rithm analysis.
+Fig. 15. Comparison between Pollux and DeepBoot in large scale training
+DLTs scheduling. (a) Average, 50%ile and 95%ile JCT. (b) Average SPEEDUP
+of training DLTs.
+SPEEDUP , from the perspective of global execution, DeepBoot
+always outperforms baseline Pollux.
+C. Testbed Experiment
+Overall Analysis: The summary results of the testbed exper-
+iments are shown in Table IIand the queuing time is the time
+from the job submission to the ﬁrst GPU usage. Since the scale
+of the testbed cluster is smaller than the simulator, queuing time
+becomes the major overhead for training DLTs because of the
+insufﬁcient GPUs. Meanwhile, the network bandwidth limits the
+gain of multi-worker-multi-GPUs training, i.e., increasing theTABLE II
+OVERVIEW RESULT OF TESTBED EXPERIMENT .
+number of GPUs does not produce a signiﬁcant improvement in
+training efﬁciency.
+Similar to the conclusions on the simulator, the JCT of Deep-
+Boot and Pollux are the same, and the JCT of DeepBoot is
+(1.1x, 1.4x, 1.1x, 4.9x) smaller than Optimus, Tiresias, AFS, and
+Aryl respectively. Optimus’s strategy is friendly for larger tasks,
+which leads to the small DLTs being pended and experiencing
+the larger average JCT. Tiresias require tasks to be allocated to
+a preset number of GPUs before they will run, which leads to a
+more severe queuing situation for training DLTs in the testbed
+environment. Aryl takes the largest weighted remaining time as a
+priority, leading to a similar situation in Optimus. Therefore, the
+queuing time of Optimus, Tiresias, and Aryl is (3.7x, 4.6x, 11.7x)
+larger than DeepBoot. AFS allocates GPUs for training DLTs as
+much as possible. When network bandwidth is ideal, this strategy
+makes sense. However, distributed training in multi-workers can
+reduce the efﬁciency with low network bandwidth since commu-
+nication cost is larger than data iteration. In Fig. 16, 95%ile JCT
+of AFS is the largest among all algorithms. Pollux and DeepBoot
+optimize the target in the form of metric boost percentage, which
+is fairer to DLTs with different scales. Therefore, they have
+approximate results in the testbed.
+On the comparison of inference scheduling algorithms, Deep-
+Boot achieves (1.3x, 1.1x) improvement compared to random
+and Aryl. Aryl uses worker-level recycling, leading to an in-
+crease in queuing time in the absence of GPUs. Besides, the
+inﬂuence of random reclaiming strategy in training DLTs is
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2565
+Fig. 16. JCT and queuing time analysis in testbed experiment. Top: Average
+JCT of different schedule algorithm. Bottom: Queuing time of different schedule
+algorithm.
+greater than in the simulator because of limited GPUs in the
+testbed.
+At the protection time level, DeepBoot improves (1.3x, 2.1x)
+compared to unprotected and 4x. Although removing the protec-
+tion state can reduce the queuing time and allows training tasks
+to get GPUs faster as shown in Table II, it leads to an increase
+in restart times. On the contrary, the 4x protection time makes
+the idle inference GPU unavailable for training DLTs, resulting
+in larger JCT because of the insufﬁcient GPU resource.
+AFE Progress: The simulator analyzes the beneﬁts of AFE at
+the system level, and testbed analyzes the impact of introducing
+AFE at the job level. Due to the bandwidth limitation, the allo-
+cation in Pollux tends to be stable in single-worker-multi-GPUs
+for small tasks such as Cifar10. The reduction of conﬂict cases
+leads to insigniﬁcant gains of AFE in testbed for the major part
+of small tasks.
+Therefore, in this experiment, we artiﬁcially set the change
+in the number of GPU allocations at the speciﬁed time, where
+the adjustment interval of Bert is 120 seconds and 60 seconds
+for others. The initial allocation GPU number of the task is
+2 and allocation will update like (2→4→8→4→2)as a
+circulation. The zero slope in Fig. 17shows the pending state
+due to the re-allocation. ImageNet is not introduced due to its
+scale in the testbed, and NeuMF ﬁxed the number of GPUs to
+1. We use intensive scaling perturbations in 1000 seconds to
+analyze their training progress.
+The introduction of elastic training makes the tendency of
+progress smoother, especially for tasks such as Bert with a large
+restart overhead, where the allocation changes keep it pending
+without elastic training. The HPO of Pollux allows the task to
+adjust the gradient accumulation steps and batch size with a
+speciﬁed GPU allocation to improve the training efﬁciency. The
+simultaneous introduction of AFE to support elastic training in
+Pollux guarantees maximum efﬁciency of training DLTs.
+D. Discussion
+Heterogeneous Training: In out experiment we use the iso-
+morphic GPU case to practice the training-inference cluster. In
+Fig. 17. Training progress analysis in DeepBoot.
+fact, due to the expensive cost of most advanced GPU, training
+clusters tend to use expensive GPUs with large GPU memory
+such as the A100, while inference clusters use T40 GPU. Hetero-
+geneous GPUs between clusters can produce performance dif-
+ferences when applying distributed training. Current works [15],
+[52],[53] discuss the the higher performance of distributed
+training in heterogeneous resources, which can be applied in
+our future work.
+Consistency Between Simulator and Testbed: Although the
+data for the simulator are based on those obtained in the Pollux
+experiments, where the scale of GPU workers, number of GPUs
+in each worker and network bandwidth are different from our
+testbed, it still supports the conclusion of our simulator and
+testbed environments. Meanwhile, the conclusions in testbed
+experiment are approximately consistent with the simulator.
+VIII. R ELATED WORK
+GPU Cluster Scheduling: Optimus [12] models the through-
+put of distributed training for PS architectures and prioritizes
+GPU allocation to the tasks with the highest drop in training
+time. Tiresias [10] only runs when the number of GPUs meets the
+training task requirements and polls according to the time slice.
+It does not support elastic training, which makes it easy for the
+job to be pended when it cannot get enough GPUs and affects the
+training efﬁciency. AFS [9]allocates GPUs as much as possible
+and prioritizes GPUs to those with the highest percentage of
+throughput. This strategy leads to frequent reclaiming and the
+system needs to be supported by CoDDL to reduce the cost when
+allocation updates. Aryl [23] takes the weighted runtime [54] re-
+duction as the optimization objective of the knapsack algorithm
+for the scheduling, which is not effective for workload with a
+large number of short jobs. DeepBoot’s ATS-T approximates
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \n2566 IEEE TRANSACTIONS ON PARALLEL AND DISTRIBUTED SYSTEMS, VOL. 34, NO. 9, SEPTEMBER 2023
+the assignment of NSGA II in Pollux by dynamic programming
+with FITNESS in(1)as an optimization objective and makes it
+available in large-scale deep learning cluster.
+Elastic Training: Elan [30],E D L [32], and CoDDL [9]are
+representative of current work on elastic training acceleration.
+Although these works differ in the scenario of application,
+algorithm framework, and implementation level, the beneﬁt is
+that the unaffected replicas in distributed training continue to
+train when the allocation changes to save model loading and
+container initialization time. However, the previous work only
+updates the data set access process when allocation changes
+since checkpoints of the model are saved in iteration intervals.
+It limits the application of elastic training in Pollux, where the
+checkpoint is only saved when allocation updates. AFE imple-
+ments a checkpoint management mode for the Pollux and the
+user does not need to manually set the saving iteration interval.
+IX. C ONCLUSION
+We propose DeepBoot supporting training DLTs to utilize the
+idle GPUs in the inference cluster and overcome the imbalance
+GPU utilization due to the periodic difference of training and
+inference workload. It manages training and inference tasks in
+the cluster through the ATS scheduling algorithm, while taking
+AFE to avoid the high preemption overhead of training DLTs.
+ATS algorithm can support large-scale scheduling, manage the
+application of inference GPUs and minimize the inﬂuence of
+training DLTs. We also analyze other DL schedulers in the
+training-inference situation and the results in the simulator and
+testbed show our advanced performance with a reduction of
+(2.0x, 1.5x, 1.3x) and (1.1x, 1.4x, 1.1x) compared with Opti-
+mus, Tiresias, and AFS respectively in average JCT. Besides,
+compared with the baseline of Pollux without utilizing idle
+inference GPU, DeepBoot can get 32% and 38% reduction on
+the testbed and simulator in average JCT. In the future, support
+for heterogeneous GPUs between training and inference clusters
+will be introduced in our cluster.
+ACKNOWLEDGMENT
+The authors would like to thanks the reviewers for their
+constructive comments to improve the quality of this article.
+REFERENCES
+[1] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image
+recognition,” in Proc. IEEE Conf. Comput. Vis. Pattern Recognit. , 2016,
+pp. 770–778.
+[2] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, “BERT: Pre-training of
+deep bidirectional transformers for language understanding,” 2018, arXiv:
+1810.04805 .
+[3] D. Amodei et al., “Deep speech 2: End-to-end speech recognition in En-
+glish and Mandarin,” in Proc. Int. Conf. Mach. Learn. , 2016, pp. 173–182.
+[4] X. He, L. Liao, H. Zhang, L. Nie, X. Hu, and T.-S. Chua, “Neural
+collaborative ﬁltering,” in Proc. 26th Int. Conf. World Wide Web , 2017,
+pp. 173–182.
+[5] A. Paszke et al., “PyTorch: An imperative style, high-performance deep
+learning library,” in Proc. Adv. Neural Inf. Process. Syst. , 2019.
+[6] M. Abadi et al., “TensorFlow: A system for Large-Scale machine learning,”
+inProc. 12th USENIX Symp. Operating Syst. Des. Implementation , 2016,
+pp. 265–283.[7] B. Burns et al., “Omega Borg, and Kubernetes,” Commun. ACM , vol. 59,
+no. 5, pp. 50–57, 2016.
+[8] V . K. Vavilapalli et al., “Apache Hadoop YARN: Yet another resource
+negotiator,” in Proc. 4th Annu. Symp. Cloud Comput. , 2013, pp. 1–16.
+[9] C. Hwang, T. Kim, S. Kim, J. Shin, and K. Park, “Elastic resource sharing
+for distributed deep learning,” in Proc. 18th USENIX Symp. Networked
+Syst. Des. Implementation , 2021, pp. 721–739.
+[10] J. Gu et al., “Tiresias: A- GPU cluster manager for distributed deep
+learning,” in Proc. 16th USENIX Symp. Netw. Syst. Des. Implementation ,
+2019, pp. 485–500.
+[11] W. Xiao et al., “Gandiva: Introspective cluster scheduling for deep learn-
+ing,” in Proc. 13th USENIX Symp. Operating Syst. Des. Implementation ,
+2018, pp. 595–610.
+[12] Y . Peng, Y . Bao, Y . Chen, C. Wu, and C. Guo, “Optimus: An efﬁcient
+dynamic resource scheduler for deep learning clusters,” in Proc. 13th
+EuroSys Conf. Conf. , 2018, pp. 1–14.
+[13] U. Misra et al., “Rubberband: Cloud-based hyperparameter tuning,” in
+Proc. 16th Eur. Conf. Comput. Syst. , 2021, pp. 327–342.
+[14] A. Qiao et al., “Pollux: Co-adaptive cluster scheduling for goodput-
+optimized deep learning,” in Proc. 15th USENIX Symp. Operating Syst.
+Des. Implementation , 2021.
+[15] D. Narayanan, K. Santhanam, F. Kazhamiaka, A. Phanishayee, and M. Za-
+haria, “Heterogeneity-Aware cluster scheduling policies for deep learning
+workloads,” in Proc. 14th USENIX Symp. Operating Syst. Des. Implemen-
+tation , 2020, pp. 481–498.
+[16] D. Crankshaw, X. Wang, G. Zhou, M. J. Franklin, J. E. Gonzalez, and
+I. Stoica, “Clipper: A. Low-Latency online prediction serving system,” in
+Proc. 14th USENIX Symp. Networked Syst. Des. Implementation , 2017,
+pp. 613–627.
+[17] F. Romero, Q. Li, N. J. Yadwadkar, and C. Kozyrakis, “INFaaS: Automated
+model-less inference serving,” in Proc. USENIX Annu. Tech. Conf. , 2021,
+pp. 397–411.
+[18] T. Brown et al., “Language models are few-shot learners,” in Proc. Adv.
+Neural Inf. Process. Syst. , 2020, pp. 1877–1901.
+[19] K. Hazelwood et al., “Applied machine learning at facebook: A datacen-
+ter infrastructure perspective,” in Proc. IEEE Int. Symp. High Perform.
+Comput. Archit. , 2018, pp. 620–629.
+[20] M. Jeon, S. Venkataraman, A. Phanishayee, J. Qian, W. Xiao, and
+F. Yang, “Analysis of large-scale multi-tenant GPU clusters for DNN
+training workloads,” in Proc. USENIX Annu. Tech. Conf. , 2019,
+pp. 947–960.
+[21] Q. Weng et al., “MLaaS in the wild: Workload analysis and scheduling in
+Large-Scale heterogeneous GPU clusters,” in Proc. 19th USENIX Symp.
+Networked Syst. Des. Implementation , 2022, pp. 945–960.
+[22] Q. Hu, P. Sun, S. Yan, Y . Wen, and T. Zhang, “Characterization and
+prediction of deep learning workloads in large-scale GPU datacenters,”
+inProc. Int. Conf. High Perform. Comput. Netw. Storage Anal. , 2021,
+pp. 1–15.
+[23] J. Li, H. Xu, Y . Zhu, Z. Liu, C. Guo, and C. Wang, “Aryl: An elastic cluster
+scheduler for deep learning,” 2022, arXiv:2202.07896 .
+[24] Tensorﬂow serving, 2022. [Online]. Available: https://github.com/
+tensorﬂow/serving
+[25] Torchserve, 2022. [Online]. Available: https://pytorch.org/serve/
+[26] A. Gujarati et al., “Serving DNNs like clockwork: Performance pre-
+dictability from the bottom up,” in Proc. 14th USENIX Symp. Operating
+Syst. Des. Implementation , 2020, pp. 443–462.
+[27] Z. Bai, Z. Zhang, Y . Zhu, and X. Jin, “PipeSwitch: Fast pipelined context
+switching for deep learning applications,” in Proc. 14th USENIX Symp.
+Operating Syst. Des. Implementation , 2020, pp. 499–514.
+[28] W. Gao, Z. Ye, P. Sun, Y . Wen, and T. Zhang, “Chronus: A novel deadline-
+aware scheduler for deep learning training jobs,” in Proc. ACM Symp.
+Cloud Comput. , 2021, pp. 609–623.
+[29] K. Deb, A. Pratap, S. Agarwal, and T. Meyarivan, “A fast and elitist
+multiobjective genetic algorithm: NSGA-II,” IEEE Trans. Evol. Comput. ,
+vol. 6, no. 2, pp. 182–197, Apr. 2002.
+[30] L. Xie et al., “Elan: Towards generic and efﬁcient elastic training for deep
+learning,” in Proc. IEEE 40th Int. Conf. Distrib. Comput. Syst. , 2020,
+pp. 78–88.
+[31] Torchelastic, 2022. [Online]. Available: https://pytorch.org/elastic
+[32] S. Wang, A. Pi, and X. Zhou, “Elastic parameter server: Accelerating ML
+training with scalable resource scheduling,” IEEE Trans. Parallel Distrib.
+Syst. , vol. 33, no. 5, pp. 1128–1143, May 2022.
+[33] A. Krizhevsky et al., “Learning multiple layers of features from tiny
+images,” 2009.
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. \nCHEN et al.: DEEPBOOT: DYNAMIC SCHEDULING SYSTEM FOR TRAINING AND INFERENCE DEEP LEARNING TASKS 2567
+[34] F. M. Harper and J. A. Konstan, “The movielens datasets: History and
+context,” ACM Trans. Interactive Intell. Syst. , vol. 5, no. 4, pp. 1–19,
+2015.
+[35] P. Rajpurkar, J. Zhang, K. Lopyrev, and P. Liang, “SQuAD: 100,000
+questions for machine comprehension of text,” 2016, arXiv:1606.05250 .
+[36] J. Deng, W. Dong, R. Socher, L.-J. Li, K. Li, and L. Fei-Fei, “ImageNet:
+A large-scale hierarchical image database,” in Proc. IEEE Conf. Comput.
+Vis. Pattern Recognit. , 2009, pp. 248–255.
+[37] Pollux artifact, 2022. [Online]. Available: https://github.com/petuum/
+adaptdl/tree/osdi21-artifact
+[38] M. Han, H. Zhang, R. Chen, and H. Chen, “Microsecond-scale preemption
+for concurrent GPU-accelerated DNN inferences,” in Proc. 16th USENIX
+Symp. Operating Syst. Des. Implementation , 2022, pp. 539–558.
+[39] T. Mohammed, C. Joe-Wong, R. Babbar, and M. Di Francesco, “Dis-
+tributed inference acceleration with adaptive DNN partitioning and of-
+ﬂoading,” in Proc. IEEE Conf. Comput. Commun. , 2020, pp. 854–863.
+[40] C. Hu and B. Li, “Distributed inference with deep learning models across
+heterogeneous edge devices,” in Proc. IEEE Conf. Comput. Commun. ,
+2022, pp. 330–339.
+[41] J. Mohan, A. Phanishayee, and V . Chidambaram, “CheckFreq: Frequent,
+ﬁne-grained DNN checkpointing,” in Proc. 19th USENIX Conf. File Stor-
+age Technol. , 2021, pp. 203–216.
+[42] Kubernetes, 2022. [Online]. Available: https://kubernetes.io
+[43] Redis, 2022. [Online]. Available: https://redis.io/
+[44] H. M. Salkin and C. A. De Kluyver, “The knapsack problem: A survey,”
+Nav. Res. Logistics Quart. , vol. 22, no. 1, pp. 127–144, 1975.
+[45] Y . Wu et al., “Elastic deep learning in multi-tenant GPU clusters,” IEEE
+Trans. Parallel Distrib. Syst. , vol. 33, no. 1, pp. 144–158, Jan. 2022.
+[46] Adaptdl documentation, 2022. [Online]. Available: https://adaptdl.
+readthedocs.io/en/latest/
+[47] Torchelastic demo, 2022. [Online]. Available: https://github.com/pytorch/
+elastic/blob/master/examples
+[48] J. Redmon and A. Farhadi, “YOLOv3: An incremental improvement,”
+2018, arXiv: 1804.02767 .
+[49] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and A. Zisserman,
+“The pascal visual object classes (VOC) challenge,” Int. J. Comput. Vis. ,
+vol. 88, no. 2, pp. 303–338, 2010.
+[50] J. Kominek and A. W. Black, “The CMU arctic speech databases,” in Proc.
+5th ISCA Workshop Speech Synth. , 2004.
+[51] C. J. Shallue, J. Lee, J. Antognini, J. Sohl-Dickstein, R. Frostig, and
+G. E. Dahl, “Measuring the effects of data parallelism on neural network
+training,” J. Mach. Learn. Res. , vol. 20, no. 112, pp. 1–49, 2019. [Online].
+Available: http://jmlr.org/papers/v20/18--789.html
+[52] S. Chaudhary, R. Ramjee, M. Sivathanu, N. Kwatra, and S. Viswanatha,
+“Balancing efﬁciency and fairness in heterogeneous GPU clusters for deep
+learning,” in Proc. 15th Eur. Conf. Comput. Syst. , 2020, pp. 1–16.
+[53] X. Miao et al., “Heterogeneity-aware distributed machine learning training
+via partial reduce,” in Proc. Int. Conf. Manage. Data , 2021, pp. 2262–2270.
+[54] G. X. Yu, Y . Gao, P. Golikov, and G. Pekhimenko, “A runtime-based
+computational performance predictor for deep neural network training,”
+2021, arXiv:2102.00527 .
+Zhenqian Chen received the BE degree from
+the Zhejiang University of Technology, Hangzhou,
+China, in 2021. He is currently working toward the
+PhD degree with College of Computer Science and
+Technology, Zhejiang University, Hangzhou. His cur-
+rent research interest includes operation system and
+machine learning.
+Xinkui Zhao received the PhD degree from the Col-
+lege of Computer Science and Technology from the
+Zhejiang University, in 2016. He is a ZJU 100-Young
+professor with Zhejiang University, China. His re-
+search interests mainly include cloud-native architec-
+ture and technologies, edge computing, and service
+computing.
+Chen Zhi received the PhD degree in computer sci-
+ence from Zhejiang University, in 2022. He is cur-
+rently a distinguished associate research fellow in the
+School of Software Technology, Zhejiang University.
+He has published more than 10 papers in international
+journals and conferences. His current research inter-
+ests include service computing, program analysis, and
+software engineering.
+Jianwei Yin received the PhD degree in computer
+science from Zhejiang University, in 2001. He was
+a visiting scholar with the Georgia Institute of Tech-
+nology. He is currently a full professor in the College
+of Computer Science, Zhejiang University. He has
+published more than 100 papers in top international
+journals and conferences. His current research inter-
+ests include service computing and business process
+management. He is an associate editor of the IEEE
+Transactions on Services Computing .
+Authorized licensed use limited to: University of Malaya. Downloaded on October 06,2026 at 04:32:59 UTC from IEEE Xplore.  Restrictions apply. 

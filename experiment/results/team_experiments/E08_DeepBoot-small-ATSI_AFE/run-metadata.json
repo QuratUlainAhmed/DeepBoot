@@ -1,0 +1,10 @@
+{
+    "start_time":  "2026-11-25T19:49:18.7657000+05:00",
+    "end_time":  "2026-11-25T20:19:23.7966958+05:00",
+    "runtime_seconds":  1805.03,
+    "exit_status":  0,
+    "command":  "C:\\Users\\HP\\miniconda3\\envs\\pollux\\python.exe -u simulator.py --workload experiment/workload/small.csv --AFE 1 --AISS 1 --ARYL 0 --log_file 0 --output C:\\Users\\HP\\DeepBoot\\experiment\\results\\team_experiments\\E08_DeepBoot-small-ATSI_AFE\\simulator-output --min-nodes 16 --num-gpus 4 --policy dp",
+    "python_version":  "Python 3.8.12",
+    "git_commit":  "f1f7ada17371ccf3bbdbcc269ee074cb3f32bf2b",
+    "branch":  "audit/e02-configuration-forensics"
+}
