@@ -46,6 +46,17 @@ def slot_table(snapshot: dict, num_nodes: int, gpus_per_node: int) -> List[Dict]
     return rows
 
 
+def short_label(job: str) -> str:
+    """Compact slot label: inference-<model>-<n> -> <model[:5]>·<n>; <app>-<n> -> <app[:6]>-<n>."""
+    if not job:
+        return ""
+    if job.startswith("inference-"):
+        parts = job.split("-")
+        return f"{parts[1][:4]}·{parts[-1]}"
+    parts = job.rsplit("-", 1)
+    return f"{parts[0][:4]}-{parts[-1]}" if len(parts) == 2 else parts[0][:7]
+
+
 def cluster_figure(snapshot: dict, num_nodes: int, gpus_per_node: int, highlight_job: str = "") -> go.Figure:
     rows = slot_table(snapshot, num_nodes, gpus_per_node)
     half = num_nodes // 2
@@ -57,14 +68,7 @@ def cluster_figure(snapshot: dict, num_nodes: int, gpus_per_node: int, highlight
         xs.append(x)
         ys.append(y)
         colors.append(COLORS[r["cat"]])
-        if r["job"].startswith("inference-"):  # inference-<model>-<n>  ->  <model[:5]>·<n>
-            parts = r["job"].split("-")
-            texts.append(f"{parts[1][:5]}·{parts[-1]}")
-        elif r["job"]:
-            parts = r["job"].rsplit("-", 1)
-            texts.append(f"{parts[0][:6]}-{parts[-1]}" if len(parts) == 2 else parts[0][:8])
-        else:
-            texts.append("")
+        texts.append(short_label(r["job"]))
         pod = r["pod"] or {}
         h = f"<b>Worker {r['node']} · GPU slot {r['slot']}</b><br>{LABELS[r['cat']]}"
         if r["job"]:
@@ -80,8 +84,7 @@ def cluster_figure(snapshot: dict, num_nodes: int, gpus_per_node: int, highlight
         marker=dict(symbol="square", size=46, color=colors, line=dict(width=2, color=lines)),
         hovertext=hovers, hoverinfo="text", customdata=custom,
     ))
-    for col, title in ((0, f"Workers 0–{half - 1} · nominal TRAINING cluster"),
-                       (1, f"Workers {half}–{num_nodes - 1} · nominal INFERENCE cluster")):
+    for col, title in ((0, f"Workers 0–{half - 1}"), (1, f"Workers {half}–{num_nodes - 1}")):
         fig.add_annotation(x=col * (gpus_per_node + 1.6) + (gpus_per_node - 1) / 2, y=0.85, text=title,
                            showarrow=False, font=dict(size=12, color=COLORS["muted"]))
         for i in range(half):
@@ -101,3 +104,73 @@ def node_counts(snapshot: dict, num_nodes: int, gpus_per_node: int) -> Dict[int,
         if r["slot"] < gpus_per_node:
             out[r["node"]][r["cat"]] += 1
     return out
+
+
+# ---------------------------------------------------------------- HTML grid
+_CAT_CLASS = {"idle": "idle", "training": "trn", "training_rescaling": "rsc", "inference_running": "inf",
+              "inference_protect": "pro", "inference_sleep": "slp"}
+
+
+def _per_node_jobs(snapshot: dict) -> Dict[int, Counter]:
+    out: Dict[int, Counter] = {}
+    for job, alloc in snapshot.get("allocations", {}).items():
+        for node, cnt in Counter(alloc).items():
+            out.setdefault(int(node), Counter())[job] += cnt
+    return out
+
+
+def _cats(snapshot: dict, num_nodes: int, gpus_per_node: int) -> Dict[tuple, str]:
+    return {(r["node"], r["job"]): r["cat"] for r in slot_table(snapshot, num_nodes, gpus_per_node) if r["job"]}
+
+
+def cluster_html(snapshot: dict, num_nodes: int, gpus_per_node: int, prev: dict = None,
+                 focus: set = frozenset(), animate: bool = False, cols: int = 4) -> str:
+    """Worker cards with one cell per GPU slot, built from a controller snapshot.
+
+    Per-worker counts and owners are exactly the simulator's (Cluster.allocations).
+    Slot position inside a worker is illustrative (GPUs have no identity there).
+    If `prev` is given, slots whose (worker, job) count grew, or whose state
+    changed, are marked as changed; GPUs a job lost on a worker are listed as
+    released on that worker card. Both are derived from the two snapshots only.
+    """
+    rows = slot_table(snapshot, num_nodes, gpus_per_node)
+    pods = snapshot.get("pods", {})
+    now_jobs = _per_node_jobs(snapshot)
+    old_jobs = _per_node_jobs(prev) if prev else {}
+    old_cats = _cats(prev, num_nodes, gpus_per_node) if prev else {}
+    by_node: Dict[int, List[Dict]] = {n: [] for n in range(num_nodes)}
+    for r in rows:
+        if r["slot"] < gpus_per_node:
+            by_node[r["node"]].append(r)
+    cards = []
+    for n in range(num_nodes):
+        new_c, old_c = now_jobs.get(n, Counter()), old_jobs.get(n, Counter())
+        grown = {j: new_c[j] - old_c.get(j, 0) for j in new_c if new_c[j] > old_c.get(j, 0)} if prev else {}
+        lost = {j: old_c[j] - new_c.get(j, 0) for j in old_c if old_c[j] > new_c.get(j, 0)} if prev else {}
+        used = sum(new_c.values())
+        cells = []
+        for r in by_node[n]:
+            job, cat = r["job"], r["cat"]
+            cls = ["gpu", _CAT_CLASS[cat]]
+            if job and job in focus:
+                cls.append("focus")
+            if animate and job and grown.get(job, 0) > 0:
+                cls.append("chg-in")
+                grown[job] -= 1
+            elif animate and job and prev and old_cats.get((n, job)) not in (None, cat):
+                cls.append("chg-state")
+            tip = f"Worker {n} · slot {r['slot']} (illustrative)&#10;{LABELS[cat]}"
+            if job:
+                tip += f"&#10;Owner: {job} ({len(snapshot['allocations'].get(job, []))} GPU total)"
+                p = pods.get(job)
+                if p:
+                    tip += f"&#10;app: {p.get('app')} · serving: {p.get('curr_job') or '—'}"
+                    tip += f"&#10;live_time: {p.get('live_time')} s · reuse count: {p.get('cache_times')}"
+            cells.append(f'<div class="{" ".join(cls)}" title="{tip}"><span>{short_label(job)}</span></div>')
+        foot = ""
+        if animate and lost:
+            foot = '<div class="w-lost">released: ' + ", ".join(f"{short_label(j)}×{k}" for j, k in sorted(lost.items())) + "</div>"
+        busy = " busy" if used else ""
+        cards.append(f'<div class="worker{busy}"><div class="w-head"><b>W{n:02d}</b><span>{used}/{gpus_per_node}</span></div>'
+                     f'<div class="w-slots g{gpus_per_node}">{"".join(cells)}</div>{foot}</div>')
+    return f'<div class="db-cluster">{"".join(cards)}</div>'

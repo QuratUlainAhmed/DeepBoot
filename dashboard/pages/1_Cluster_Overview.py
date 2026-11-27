@@ -61,7 +61,7 @@ with right:
     w = st.selectbox("Worker details", list(range(N)), index=w if w is not None else 0,
                      format_func=lambda n: f"Worker {n}")
     counts = node_counts(snap, N, G)[w]
-    st.markdown(f'<div class="db-card"><b>Worker {w}</b> · {"nominal training" if w < N // 2 else "nominal inference"} half<br>'
+    st.markdown(f'<div class="db-card"><b>Worker {w}</b><br>'
                 + "<br>".join(f"{theme.LABELS[k]}: <b>{v}</b>" for k, v in counts.items() if v) + "</div>",
                 unsafe_allow_html=True)
     rows = []

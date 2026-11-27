@@ -21,7 +21,7 @@ def test_next_step_button_advances_real_simulation():
     from dashboard.engine import state_manager
     ctl = state_manager.controller()
     before = ctl.steps_executed
-    next_btn = [b for b in at.button if "Next step" in b.label][0]
+    next_btn = [b for b in at.button if "Next Event" in b.label][0]
     next_btn.click().run()
     assert not at.exception
     assert ctl.steps_executed == before + 1
