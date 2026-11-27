@@ -418,7 +418,10 @@ class Job(object):
 class Cluster(object):
     def __init__(self, workload, policy, min_nodes, num_gpus=4,
                  max_nodes=None, interference=0.0,
-                 low_util=None, high_util=None):
+                 low_util=None, high_util=None,
+                 size_aware_scheduling=False, size_aware_alpha=0.4,
+                 size_aware_beta=0.3, size_aware_gamma=0.3,
+                 size_aware_strength=0.5):
         # assert 1 <= num_gpus <= 4
         self.workload = workload
         self.policy = policy
@@ -431,7 +434,13 @@ class Cluster(object):
         self.current_time = 0
         self.clock = 0
 
-        self.infer_scheduler = InferScheduler()
+        self.infer_scheduler = InferScheduler(
+            size_aware_scheduling=size_aware_scheduling,
+            size_aware_alpha=size_aware_alpha,
+            size_aware_beta=size_aware_beta,
+            size_aware_gamma=size_aware_gamma,
+            size_aware_strength=size_aware_strength,
+        )
         self.infer_scheduler.aryl = ARYL
 
         self.infer_scheduler.random = RANDOM_ALLOCATE
@@ -837,6 +846,11 @@ class Cluster(object):
         return job_infos
 
     def get_pollux_job_info(self, job):
+        restart_cost_seconds = (
+            NEXT_DELAY[job.application.name]
+            if AFE
+            else APPLICATIONS_DELAY[job.application.name]
+        )
         job_info = JobInfo(
             job=job,
             resources={"nvidia.com/gpu": 1},
@@ -851,10 +865,12 @@ class Cluster(object):
             # max_replicas=min(64,  # simulator can't handle more.
             #                  job.application.max_batch_size // job.application.min_local_bsz),
             preemptible=True,
+            num_restarts=job.num_restarts or 0,
+            restart_cost_seconds=restart_cost_seconds,
+            current_replicas=sum(job.placement),
         )
         if job.application.name == "ncf":
             job_info.max_replicas = 1
-        job_info.num_restarts = job.num_restarts or 0
         job_info.age = self.current_time - job.submission_time
         return job_info
 
@@ -1086,7 +1102,12 @@ def simulate(args):
 
     simulator = Cluster(workload, policy, args.min_nodes, num_gpus=args.num_gpus,
                         max_nodes=args.max_nodes, interference=args.interference,
-                        low_util=args.low_util, high_util=args.high_util)
+                        low_util=args.low_util, high_util=args.high_util,
+                        size_aware_scheduling=bool(args.size_aware_scheduling),
+                        size_aware_alpha=args.size_aware_alpha,
+                        size_aware_beta=args.size_aware_beta,
+                        size_aware_gamma=args.size_aware_gamma,
+                        size_aware_strength=args.size_aware_strength)
 
     simulator.protect_time = args.protect_time
 
@@ -1206,6 +1227,17 @@ if __name__ == "__main__":
 
     parser.add_argument("--random_allocate", type=int,
                         default=0, help="inference task random allocate")
+    parser.add_argument("--size_aware_scheduling", type=int, choices=[0, 1],
+                        default=0,
+                        help="protect costly/progressed training jobs during ATS-I GPU reclaiming")
+    parser.add_argument("--size_aware_alpha", type=float, default=0.4,
+                        help="weight for estimated restart cost in size-aware protection")
+    parser.add_argument("--size_aware_beta", type=float, default=0.3,
+                        help="weight for previous restarts in size-aware protection")
+    parser.add_argument("--size_aware_gamma", type=float, default=0.3,
+                        help="weight for accumulated execution time in size-aware protection")
+    parser.add_argument("--size_aware_strength", type=float, default=0.5,
+                        help="maximum relative ATS-I speedup weight increase for protected jobs")
 
     parser.add_argument("--log_file", type=int, default=0,
                         help="log out")
@@ -1222,6 +1254,18 @@ if __name__ == "__main__":
                         help="path to output metric info")
 
     args = parser.parse_args()
+
+    size_aware_weights = (
+        args.size_aware_alpha,
+        args.size_aware_beta,
+        args.size_aware_gamma,
+    )
+    if (not all(math.isfinite(weight) for weight in size_aware_weights)
+            or any(weight < 0 for weight in size_aware_weights)
+            or sum(size_aware_weights) <= 0):
+        parser.error("size-aware weights must be non-negative with a positive sum")
+    if not math.isfinite(args.size_aware_strength) or args.size_aware_strength < 0:
+        parser.error("size-aware strength must be non-negative")
 
     AISS = args.AISS
     AFE = args.AFE

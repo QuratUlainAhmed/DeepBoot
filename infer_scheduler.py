@@ -20,10 +20,26 @@ def array2onehot(array,num_classes=None):
     return np.array(np.eye(num_classes)[array],dtype=np.int)
 
 class InferScheduler(object):
-    def __init__(self):
+    def __init__(self, size_aware_scheduling=False, size_aware_alpha=0.4,
+                 size_aware_beta=0.3, size_aware_gamma=0.3,
+                 size_aware_strength=0.5):
+        weights = (size_aware_alpha, size_aware_beta, size_aware_gamma)
+        if (not all(np.isfinite(weight) for weight in weights)
+                or any(weight < 0 for weight in weights)
+                or sum(weights) <= 0):
+            raise ValueError("size-aware weights must be non-negative with a positive sum")
+        if not np.isfinite(size_aware_strength) or size_aware_strength < 0:
+            raise ValueError("size-aware strength must be non-negative")
+
         self.infer_schedule = True
         self.aryl = True
         self.random = False
+        self.size_aware_scheduling = size_aware_scheduling
+        self.size_aware_alpha = size_aware_alpha
+        self.size_aware_beta = size_aware_beta
+        self.size_aware_gamma = size_aware_gamma
+        self.size_aware_strength = size_aware_strength
+        self.training_priority_weights = np.array([], dtype=float)
         
     
     def _allocations_to_state(self, allocations, jobs, nodes):
@@ -61,7 +77,43 @@ class InferScheduler(object):
                 num_nodes[:, idx], num_replicas[:, idx]))
         
         # LOG.info("speedup: %s",speedup)
-        return np.stack(speedup, axis=1).astype(np.float)
+        speedups = np.stack(speedup, axis=1).astype(np.float)
+        if self.size_aware_scheduling:
+            speedups *= self.training_priority_weights[np.newaxis, :]
+        return speedups
+
+    @staticmethod
+    def _normalize_priority_component(values):
+        values = np.asarray(values, dtype=float)
+        maximum = float(np.max(values)) if values.size else 0.0
+        if maximum <= 0:
+            return np.zeros_like(values)
+        return values / maximum
+
+    def _get_training_priority_weights(self, jobs):
+        if not self.size_aware_scheduling:
+            return np.ones(len(jobs), dtype=float)
+
+        restart_cost = [
+            job.restart_cost_seconds * max(job.current_replicas, 1)
+            for job in jobs
+        ]
+        restart_count = [job.num_restarts for job in jobs]
+        execution_time = [job.run_time for job in jobs]
+
+        cost_scores = self._normalize_priority_component(restart_cost)
+        restart_scores = self._normalize_priority_component(restart_count)
+        execution_scores = self._normalize_priority_component(execution_time)
+
+        total_weight = (
+            self.size_aware_alpha + self.size_aware_beta + self.size_aware_gamma
+        )
+        priority_scores = (
+            self.size_aware_alpha * cost_scores
+            + self.size_aware_beta * restart_scores
+            + self.size_aware_gamma * execution_scores
+        ) / total_weight
+        return 1.0 + self.size_aware_strength * priority_scores
 
     def take_available_gpu(self):
 
@@ -292,6 +344,9 @@ class InferScheduler(object):
         self.training_state = self.base_state[self.training]
         self.infer_state = self.base_state[self.inference]
         self.sleep_state = self.base_state[self.sleep]
+        self.training_priority_weights = self._get_training_priority_weights(
+            [job for job in jobs if not job.inference]
+        )
 
         rtypes = sorted(set.union(*[set(job.resources) for job in jobs]))
         # Build array of job resources: <num_jobs> x <num_rtypes>. Each entry

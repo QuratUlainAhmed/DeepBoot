@@ -3,7 +3,9 @@
 
 class JobInfo(object):
     def __init__(self, job,resources, speedup_fn, creation_timestamp, attained_service,
-                 min_replicas, max_replicas, preemptible=True, inference=False, duration=-1,run_time=0):
+                 min_replicas, max_replicas, preemptible=True, inference=False,
+                 duration=-1, run_time=0, num_restarts=0,
+                 restart_cost_seconds=0.0, current_replicas=0):
         """
         Args:
             resources (dict): Requested resources (eg. GPUs) of each replica.
@@ -27,6 +29,9 @@ class JobInfo(object):
         self.job = job 
         # self.inference = inference
         self.duration = duration
+        self.num_restarts = num_restarts
+        self.restart_cost_seconds = restart_cost_seconds
+        self.current_replicas = current_replicas
 
         self.application = job.application
         self.name = job.name
