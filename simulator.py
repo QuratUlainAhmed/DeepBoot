@@ -25,6 +25,7 @@ import logging
 import os
 import time
 from infer_scheduler import InferScheduler
+from cost_profile import load_cost_profile
 
 LOG = logging.getLogger('simulator')
 LOG.setLevel(logging.INFO)
@@ -119,9 +120,18 @@ class Job(object):
 
         self.current_rescale_time = 0
         self.protect_time = 30
+        if "infer" in self.application.name:
+            self.first_start_delay = 0
+            self.next_rescale_delay = 0
+            self.allocation_update_delay = 0
+        else:
+            self.first_start_delay = FIRST_DELAY[self.application.name]
+            self.next_rescale_delay = NEXT_DELAY[self.application.name]
+            self.allocation_update_delay = APPLICATIONS_DELAY[self.application.name]
 
         # (timestamp, prev_alloc, curr_alloc)
         self.placement_update_history = []
+        self.rescale_delay_history = []
         self.app = self.application.name
         if 'infer' in self.app:
             self.target_batch_size = 1
@@ -337,10 +347,8 @@ class Job(object):
         self.current_time += seconds  # Add any remaining time.
 
     def calculate_rescale_time(self, origin_placement, current_placement):
-        app_name = self.application.name
-
-        first_delay = FIRST_DELAY[app_name]
-        next_delay = NEXT_DELAY[app_name]
+        first_delay = self.first_start_delay
+        next_delay = self.next_rescale_delay
         if len(origin_placement) == 0:  # First start, do not avoid the reduce cost
             return first_delay
 
@@ -358,10 +366,8 @@ class Job(object):
             return first_delay
 
     def calculate_real_rescale_time(self, origin_placement, current_placement):
-        app_name = self.application.name
-
-        first_delay = FIRST_DELAY[app_name]
-        next_delay = NEXT_DELAY[app_name]
+        first_delay = self.first_start_delay
+        next_delay = self.next_rescale_delay
         if len(origin_placement) == 0:  
             return first_delay
         elif len(current_placement) == 0:
@@ -390,12 +396,16 @@ class Job(object):
                     self.rescale_time = self.calculate_rescale_time(
                         origin_placement, placement)
                 else:
-                    delay_dict = APPLICATIONS_DELAY
-
-                    # Start re-scale countdown. 这里要根据任务类型改
-                    self.rescale_time = delay_dict[self.application.name]
+                    self.rescale_time = self.allocation_update_delay
                 # self.rescale_time = 0 # 理论上限
                 self.current_rescale_time = self.rescale_time
+                self.rescale_delay_history.append({
+                    "time": self.current_time,
+                    "previous_gpus": sum(origin_placement),
+                    "new_gpus": sum(placement),
+                    "predicted_delay_seconds": self.rescale_time,
+                    "afe_enabled": bool(AFE),
+                })
 
                 if self.num_restarts is None:
                     self.num_restarts = 0
@@ -421,7 +431,7 @@ class Cluster(object):
                  low_util=None, high_util=None,
                  size_aware_scheduling=False, size_aware_alpha=0.4,
                  size_aware_beta=0.3, size_aware_gamma=0.3,
-                 size_aware_strength=0.5):
+                 size_aware_strength=0.5, cost_profile=None):
         # assert 1 <= num_gpus <= 4
         self.workload = workload
         self.policy = policy
@@ -429,6 +439,7 @@ class Cluster(object):
         self.num_gpus = num_gpus
         self.max_nodes = min_nodes if max_nodes is None else max_nodes
         self.interference = interference
+        self.cost_profile = cost_profile
         self.low_util = low_util
         self.high_util = high_util
         self.current_time = 0
@@ -488,6 +499,28 @@ class Cluster(object):
             for job in self.jobs:
                 if job.application.name == "ncf":
                     job.target_batch_size = 32768
+
+        if cost_profile is not None:
+            missing_costs = set()
+            for job in self.jobs:
+                if job.inference:
+                    continue
+                app_name = job.application.name
+                measured_costs = cost_profile["applications"].get(app_name)
+                if measured_costs is None:
+                    missing_costs.add(app_name)
+                    continue
+                job.first_start_delay = measured_costs["first_start_delay_seconds"]
+                job.next_rescale_delay = measured_costs["next_rescale_delay_seconds"]
+                job.allocation_update_delay = measured_costs[
+                    "allocation_update_delay_seconds"
+                ]
+            if missing_costs:
+                LOG.warning(
+                    "Cost profile %s has no measurements for applications %s; "
+                    "repository default delays will be used for those applications",
+                    cost_profile["profile_name"], sorted(missing_costs)
+                )
 
         self.job_dict = dict()
 
@@ -717,6 +750,7 @@ class Cluster(object):
         self.current_log = {
             "timestamp": self.current_time,
             "num_nodes": self.num_nodes,
+            "cost_profile": self.cost_profile,
             "optimize_history": self.optimize_history,
             "submitted_jobs": [
                 {
@@ -736,7 +770,8 @@ class Cluster(object):
                     "start_execute_time": job.start_execute_time,
                     "evaluate_finish_time": job.evaluate_finish_time,
                     "delay_time": job.total_delay,
-                    "placement_update_history": job.placement_update_history
+                    "placement_update_history": job.placement_update_history,
+                    "rescale_delay_history": job.rescale_delay_history,
                 }
                 for job in self.jobs if job.submission_time <= self.current_time
             ],
@@ -1107,7 +1142,8 @@ def simulate(args):
                         size_aware_alpha=args.size_aware_alpha,
                         size_aware_beta=args.size_aware_beta,
                         size_aware_gamma=args.size_aware_gamma,
-                        size_aware_strength=args.size_aware_strength)
+                        size_aware_strength=args.size_aware_strength,
+                        cost_profile=args.cost_profile_data)
 
     simulator.protect_time = args.protect_time
 
@@ -1202,8 +1238,10 @@ if __name__ == "__main__":
                         help="infer job has higher priority than training job")
     parser.add_argument("--protect_time", type=int, default=30,
                         help="protect time for inference replicas")
-    parser.add_argument("--interference", type=float, default=0.0,
-                        help="job slowdown due to interference")
+    parser.add_argument("--interference", type=float, default=None,
+                        help="job slowdown due to interference; profile default or 0 when omitted")
+    parser.add_argument("--cost-profile", type=str, default=None,
+                        help="JSON file of measured per-application restart costs and profile metadata")
     parser.add_argument("--num-gpus", type=int, default=4,
                         help="number of GPUs per node")
 
@@ -1255,6 +1293,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    try:
+        args.cost_profile_data = (
+            load_cost_profile(args.cost_profile) if args.cost_profile else None
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error("could not load cost profile: {}".format(error))
+    if args.interference is None:
+        args.interference = (
+            args.cost_profile_data.get("default_interference", 0.0)
+            if args.cost_profile_data else 0.0
+        )
+    if not math.isfinite(args.interference) or not 0 <= args.interference < 1:
+        parser.error("--interference must be in the range [0, 1)")
+
     size_aware_weights = (
         args.size_aware_alpha,
         args.size_aware_beta,
@@ -1287,6 +1339,9 @@ if __name__ == "__main__":
     files = os.listdir(args.output)
     for file in files:
         os.remove(os.path.join(args.output, file))
+    if args.cost_profile_data is not None:
+        with open(os.path.join(args.output, "cost-profile.json"), "w", encoding="utf-8") as profile_file:
+            json.dump(args.cost_profile_data, profile_file, indent=2)
 
     if args.log_file:
         log_file = args.output + '/simulator.log'
